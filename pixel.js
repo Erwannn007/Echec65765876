@@ -642,3 +642,29 @@ export function pottedPlant(seed = 1) {
   }
   return c.toDataURL();
 }
+
+/* Faisceau de lumière en pixel art : cône tramé (Bayer 4×4) + rayons */
+const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+export function lightBeam() {
+  const W = 110, H = 180;
+  const [c, ctx] = canvas(W, H);
+  const levels = ['', '#ffe0a01a', '#ffe0a033', '#ffe6b04d', '#fff0c870'];
+  const cx = W / 2;
+  for (let y = 0; y < H; y++) {
+    const half = 4 + y * 0.29;                        // le cône s'élargit en descendant
+    const fadeY = Math.pow(1 - y / H, 1.4);           // et s'éteint vers le bas
+    for (let x = 0; x < W; x++) {
+      const d = Math.abs(x + 0.5 - cx) / half;
+      if (d > 1.15) continue;
+      const edge = d < 0.55 ? 1 : Math.max(0, 1 - (d - 0.55) / 0.6);
+      const ang = Math.atan2(x + 0.5 - cx, y + 6);
+      const ray = Math.pow(Math.max(0, Math.sin(ang * 23 + 1.3)), 8) * 0.35 + Math.pow(Math.max(0, Math.sin(ang * 9)), 10) * 0.25;
+      const hot = y < 14 ? (14 - y) / 14 * 0.5 : 0;   // plus vif près de l'ampoule
+      const v = Math.min(1, (edge * (0.62 + ray) + hot) * fadeY) * (levels.length - 1);
+      let lv = Math.floor(v);
+      if ((v - lv) * 16 > BAYER[y % 4][x % 4]) lv++;
+      if (lv > 0) px(ctx, x, y, levels[Math.min(lv, levels.length - 1)]);
+    }
+  }
+  return c.toDataURL();
+}

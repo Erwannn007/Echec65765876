@@ -15,6 +15,21 @@
   <link rel="icon" type="image/png" href="icons/icon-192.png">
   <link rel="preload" href="fonts/PixelifySans.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="styles.css">
+  <script>
+    /* iOS, appli sur l'écran d'accueil : la hauteur annoncée oublie la barre d'état,
+       ce qui laisse une bande vide en bas. On prend la vraie hauteur de l'écran. */
+    (function () {
+      function fit() {
+        var standalone = navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+        var h = window.innerHeight;
+        if (standalone && Math.abs(screen.width - window.innerWidth) < 2 && screen.height > h) h = screen.height;
+        document.documentElement.style.setProperty('--app-h', h + 'px');
+      }
+      fit();
+      addEventListener('resize', fit);
+      addEventListener('orientationchange', function () { setTimeout(fit, 300); });
+    })();
+  </script>
 </head>
 <body>
   <div id="ambBack" class="amb amb-back"></div>
@@ -234,6 +249,7 @@
     </div>
   </div>
 
+  <div id="ambLight" class="amb amb-light"></div>
   <div id="ambFront" class="amb amb-front"></div>
 
   <script type="module" src="app.js"></script>

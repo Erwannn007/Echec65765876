@@ -4,7 +4,7 @@
    planches → lianes du fond → (contenu) → faisceau de lumière,
    poussières, lucioles, lianes du premier plan, feuilles qui tombent.
    ========================================================= */
-import { vine, lamp, leafSprite } from './pixel.js';
+import { vine, lamp, leafSprite, lightBeam } from './pixel.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 
@@ -20,10 +20,14 @@ export function initAmbience() {
   for (const v of backVines) back.appendChild(vineEl(v, 'vine back-vine'));
 
   /* --- faisceau de lumière + lampe --- */
+  // la lumière vit dans son propre calque (mode « screen ») pour vraiment éclairer
+  // ce qui est dessous ; elle se balance exactement comme la lampe.
+  const light = document.getElementById('ambLight');
+  light.innerHTML = `
+    <div class="top-glow"></div>
+    <div class="beam-wrap"><img class="beam-img" src="${lightBeam()}" alt=""><i class="bulb-glow"></i></div>`;
   front.insertAdjacentHTML('beforeend', `
-    <div class="beam"></div>
-    <div class="beam-floor"></div>
-    <div class="lamp"><i class="cord"></i><img src="${lamp()}" alt=""><i class="glow"></i></div>`);
+    <div class="lamp"><i class="cord"></i><img src="${lamp()}" alt=""></div>`);
 
   /* --- poussières qui flottent dans la lumière --- */
   const motes = document.createElement('div');

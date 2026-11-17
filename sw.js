@@ -1,6 +1,6 @@
 // Hors-ligne + mises à jour automatiques : on sert le cache tout de suite,
 // et on télécharge la nouvelle version en arrière-plan pour la prochaine ouverture.
-const VERSION = 'echecs-v5';
+const VERSION = 'echecs-v6';
 const ASSETS = [
   './', 'index.html', 'styles.css', 'app.js', 'pixel.js', 'ambience.js', 'manifest.webmanifest',
   'lib/chess.js', 'fonts/PixelifySans.woff2', 'fonts/Jersey10.woff2',

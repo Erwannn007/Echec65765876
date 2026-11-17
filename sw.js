@@ -1,11 +1,11 @@
-// Cache hors-ligne : l'appli fonctionne même sans réseau une fois installée.
-const VERSION = 'echecs-v1';
+// Hors-ligne + mises à jour automatiques : on sert le cache tout de suite,
+// et on télécharge la nouvelle version en arrière-plan pour la prochaine ouverture.
+const VERSION = 'echecs-v2';
 const ASSETS = [
-  './', 'index.html', 'styles.css', 'app.js', 'manifest.webmanifest',
-  'lib/chess.js',
+  './', 'index.html', 'styles.css', 'app.js', 'pixel.js', 'manifest.webmanifest',
+  'lib/chess.js', 'fonts/PixelifySans.woff2',
   'engine/stockfish-19-lite-single.js', 'engine/stockfish-19-lite-single.wasm',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png',
-  ...['K', 'Q', 'R', 'B', 'N', 'P'].flatMap((p) => [`pieces/w${p}.svg`, `pieces/b${p}.svg`]),
 ];
 
 self.addEventListener('install', (e) => {
@@ -21,8 +21,15 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-  if (e.request.method !== 'GET') return;
+  if (e.request.method !== 'GET' || !e.request.url.startsWith(self.location.origin)) return;
   e.respondWith(
-    caches.match(e.request, { ignoreSearch: true }).then((hit) => hit || fetch(e.request))
+    caches.open(VERSION).then(async (cache) => {
+      const hit = await cache.match(e.request, { ignoreSearch: true });
+      const net = fetch(e.request).then((res) => {
+        if (res.ok) cache.put(e.request, res.clone());
+        return res;
+      }).catch(() => hit);
+      return hit || net;
+    })
   );
 });

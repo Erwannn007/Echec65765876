@@ -328,7 +328,7 @@ export function avatar(seed) {
   if (R() < 0.5) { set(5, eyeY - 1, hair); set(6, eyeY - 1, hair); set(9, eyeY - 1, hair); set(10, eyeY - 1, hair); }
   if (glasses) {
     const gc = R() < 0.5 ? '#1a1010' : '#c9932e';
-    rect(5, 6, 3, 1, gc); rect(8, 6, 3, 1, gc); set(5, 7, gc); set(7, 7, gc); set(8, 7, gc); set(10, 7, gc); rect(5, 8, 3, 1, gc); rect(8, 8, 3, 1, gc);
+    rect(5, 6, 6, 1, gc); set(5, 7, gc); set(7, 7, gc); set(8, 7, gc); set(10, 7, gc);
     set(6, 7, '#1a1010'); set(9, 7, '#1a1010');
   }
   // joues + bouche
@@ -460,4 +460,46 @@ export function icon(name, col = '#f3e2c0') {
   const url = c.toDataURL();
   iconCache.set(key, url);
   return url;
+}
+
+/* Tapis de feutre (tuile 32×32) */
+export function feltTexture() {
+  const [c, ctx] = canvas(32, 32);
+  const R = rng(4242);
+  for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
+    const n = R();
+    px(ctx, x, y, n < 0.10 ? '#2a5230' : n < 0.17 ? '#356a3a' : n < 0.2 ? '#244828' : '#2f5d34');
+  }
+  return c.toDataURL();
+}
+
+/* Titre « ÉCHECS » en lettres pixel 5×7 dorées */
+const LETTERS = {
+  E: ['xxxxx', 'x....', 'x....', 'xxxx.', 'x....', 'x....', 'xxxxx'],
+  C: ['.xxxx', 'x....', 'x....', 'x....', 'x....', 'x....', '.xxxx'],
+  H: ['x...x', 'x...x', 'x...x', 'xxxxx', 'x...x', 'x...x', 'x...x'],
+  S: ['.xxxx', 'x....', 'x....', '.xxx.', '....x', '....x', 'xxxx.'],
+};
+export function wordmark() {
+  const word = 'ECHECS';
+  const W = word.length * 6 - 1, H = 10;
+  const M = Array.from({ length: H }, () => Array(W).fill(0));
+  [...word].forEach((ch, i) => LETTERS[ch].forEach((row, y) => [...row].forEach((v, x) => { if (v === 'x') M[y + 3][i * 6 + x] = 1; })));
+  M[0][3] = 1; M[1][2] = 1; // accent du É
+  const pad = 2;
+  const [c, ctx] = canvas(W + pad * 2 + 1, H + pad * 2 + 2);
+  const on = (x, y) => M[y]?.[x] === 1;
+  // ombre portée
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (on(x, y)) px(ctx, x + pad + 1, y + pad + 3, '#1a0c04', 1, 1);
+  // contour
+  for (let y = -1; y <= H; y++) for (let x = -1; x <= W; x++) {
+    if (on(x, y)) continue;
+    let n = false;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (on(x + dx, y + dy)) n = true;
+    if (n) { px(ctx, x + pad, y + pad, '#3a1e08'); px(ctx, x + pad, y + pad + 1, '#3a1e08'); }
+  }
+  // lettres : dégradé or
+  const ramp = ['#ffe9a0', '#ffe9a0', '#ffd56a', '#ffd56a', '#f2b134', '#f2b134', '#f2b134', '#d99520', '#b07a18', '#b07a18'];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (on(x, y)) px(ctx, x + pad, y + pad, ramp[y]);
+  return c.toDataURL();
 }

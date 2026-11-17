@@ -1,7 +1,7 @@
 import { Chess } from './lib/chess.js';
 import {
-  pieceSprite, boardImage, tableTexture, paperTexture, avatar, flag, FLAG_CODES,
-  badge, rankOf, icon, rng,
+  pieceSprite, boardImage, tableTexture, paperTexture, feltTexture, wordmark, avatar, flag, FLAG_CODES,
+  badge, rankOf, RANKS, icon, rng,
 } from './pixel.js';
 
 /* =========================================================
@@ -144,10 +144,10 @@ const store = {
 };
 
 const TCS = [
-  { id: '3+2', base: 180, inc: 2, label: 'Blitz' },
-  { id: '5+0', base: 300, inc: 0, label: 'Blitz' },
-  { id: '10+0', base: 600, inc: 0, label: 'Rapide' },
-  { id: '∞', base: 0, inc: 0, label: 'Libre' },
+  { id: '3+2', base: 180, inc: 2, label: 'Blitz', col: '#ff9a4a' },
+  { id: '5+0', base: 300, inc: 0, label: 'Blitz', col: '#f2d03a' },
+  { id: '10+0', base: 600, inc: 0, label: 'Rapide', col: '#8fd65a' },
+  { id: '∞', base: 0, inc: 0, label: 'Libre', col: '#7ab4ee' },
 ];
 
 let profile = store.get('px.profile', null);
@@ -197,6 +197,10 @@ function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 document.documentElement.style.setProperty('--table', `url(${tableTexture()})`);
 document.documentElement.style.setProperty('--plank', `url(${tableTexture(['#5b3420', '#52301d', '#4a2a19', '#66402a'])})`);
 document.documentElement.style.setProperty('--paper', `url(${paperTexture()})`);
+document.documentElement.style.setProperty('--felt', `url(${feltTexture()})`);
+$('wordmark').src = wordmark();
+$('shelf').innerHTML = [['b', 'p'], ['w', 'n'], ['b', 'q'], ['w', 'k'], ['b', 'b'], ['w', 'r'], ['b', 'p']]
+  .map(([c, t]) => `<img src="${pieceSprite(c, t)}" alt="">`).join('');
 hydrateIcons();
 
 /* =========================================================
@@ -204,17 +208,26 @@ hydrateIcons();
    ========================================================= */
 function renderHome() {
   if (!profile) return;
+  const rank = rankOf(profile.elo);
+  const next = RANKS.find((r) => r.min > profile.elo);
   $('meAvatarHome').src = avatar(profile.seed);
+  $('meFlagHome').src = flag(profile.flag);
   $('meNameHome').textContent = profile.name;
   $('meBadge').src = badge(profile.elo);
-  $('meRank').textContent = rankOf(profile.elo).name;
+  $('meRank').textContent = rank.name;
+  $('home').style.setProperty('--rank', rank.col);
   $('meElo').textContent = profile.elo;
+  const pct = next ? ((profile.elo - rank.min) / (next.min - rank.min)) * 100 : 100;
+  $('xpFill').style.width = Math.max(4, Math.min(100, pct)) + '%';
+  $('xpLeft').textContent = rank.name;
+  $('xpRight').textContent = next ? `${next.name} dans ${next.min - profile.elo} pts` : 'Rang maximum !';
   $('stW').textContent = profile.w; $('stD').textContent = profile.d; $('stL').textContent = profile.l;
   $('stPeak').textContent = profile.peak;
+  $('homeSoundIcon').src = icon(Sound.on ? 'sound' : 'mute');
   drawSpark();
 
   $('tcChips').innerHTML = TCS.map((t) =>
-    `<button class="chip${t.id === tcId ? ' on' : ''}" data-tc="${t.id}">${t.id}<small>${t.label}</small></button>`).join('');
+    `<button class="chip${t.id === tcId ? ' on' : ''}" style="--c:${t.col}" data-tc="${t.id}">${t.id}<small>${t.label}</small></button>`).join('');
   $('tcChips').querySelectorAll('.chip').forEach((b) => {
     b.onclick = () => { tcId = b.dataset.tc; store.set('px.tc', tcId); Sound.unlock(); Sound.tick(); renderHome(); };
   });
@@ -225,9 +238,12 @@ function renderHome() {
     $('resumeInfo').textContent = `${save.mode === 'ranked' ? 'Classée' : 'Amicale'} contre ${save.opp.name} · coup ${Math.ceil(save.moves.length / 2)}`;
   } else $('resumeBtn').classList.add('hidden');
 
+  const last = history.slice(0, 8).reverse();
+  $('lastDots').innerHTML = last.length ? last.map((h) => `<i class="${h.kind}"></i>`).join('') : '<em>aucune</em>';
+
   const rec = $('recent');
   if (!history.length) { rec.innerHTML = '<div class="empty">Aucune partie pour l\'instant. Lance-toi !</div>'; return; }
-  rec.innerHTML = history.slice(0, 12).map((h) => `
+  rec.innerHTML = history.map((h) => `
     <div class="rg">
       <img class="av" src="${avatar(h.seed)}" alt="">
       <div class="who"><img class="flag" src="${flag(h.flag)}" alt=""> ${esc(h.name)} <small>(${h.elo})</small><br>
@@ -236,6 +252,10 @@ function renderHome() {
       <span class="dl ${h.delta > 0 ? 'up' : h.delta < 0 ? 'down' : ''}">${h.delta == null ? '' : (h.delta > 0 ? '+' : '') + h.delta}</span>
     </div>`).join('');
 }
+
+$('historyBtn').onclick = () => { Sound.unlock(); Sound.tick(); $('historyModal').classList.remove('hidden'); };
+$('historyClose').onclick = () => $('historyModal').classList.add('hidden');
+$('homeSoundBtn').onclick = () => { Sound.unlock(); Sound.on = !Sound.on; store.set('px.sound', Sound.on); renderHome(); };
 
 function timeAgo(t) {
   const m = Math.floor((Date.now() - t) / 60000);
@@ -252,10 +272,10 @@ function drawSpark() {
   const r = profile.ratings.slice(-24);
   if (r.length < 2) return;
   const min = Math.min(...r) - 10, max = Math.max(...r) + 10;
-  const W = c.width, H = c.height, step = Math.floor(W / (r.length - 1));
+  const W = c.width, H = c.height, step = Math.max(2, Math.floor(W / (r.length - 1)));
   const ys = r.map((v) => Math.round(H - 3 - ((v - min) / (max - min)) * (H - 6)));
   const up = r.at(-1) >= r[0];
-  ctx.fillStyle = up ? '#8fd65a' : '#ff8a7a';
+  ctx.fillStyle = up ? '#b8f08a' : '#ff9a8a';
   for (let i = 0; i < r.length - 1; i++) {
     const x0 = i * step, x1 = (i + 1) * step;
     for (let x = x0; x <= x1; x += 2) {
@@ -312,8 +332,7 @@ $('pfSave').onclick = () => {
   $('profileModal').classList.add('hidden');
   renderHome();
 };
-$('editProfileBtn').onclick = () => openProfile(false);
-$('meAvatarHome').onclick = () => openProfile(false);
+$('meAvatarBtn').onclick = () => openProfile(false);
 
 /* =========================================================
    ÉTAT DE PARTIE

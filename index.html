@@ -20,44 +20,57 @@
 
   <!-- ================= ACCUEIL ================= -->
   <section id="home" class="screen active">
-    <div class="online"><i class="led"></i><span id="onlineCount">12 483</span> joueurs en ligne</div>
+    <div class="home-top">
+      <div class="online"><i class="led"></i><span id="onlineCount">12 483</span> en ligne</div>
+      <button id="homeSoundBtn" class="sq-btn" aria-label="Son"><img id="homeSoundIcon" alt=""></button>
+    </div>
 
-    <div class="panel profile" id="profileCard">
-      <img class="av big" id="meAvatarHome" alt="">
-      <div class="pmeta">
-        <div class="pname-row">
-          <span id="meNameHome" class="pname"></span>
-          <button id="editProfileBtn" class="tiny-btn" aria-label="Modifier"><img data-icon="pencil" alt=""></button>
-        </div>
-        <div class="rank-row">
-          <img id="meBadge" class="badge" alt="">
-          <span id="meRank"></span>
-        </div>
-        <div class="elo-big"><span id="meElo">800</span><small>Elo</small></div>
+    <h1 class="wordmark"><img id="wordmark" alt="Échecs"></h1>
+
+    <!-- carte joueur sur tapis de feutre -->
+    <div class="hero felt">
+      <button class="hero-av" id="meAvatarBtn" aria-label="Modifier le profil">
+        <img class="av" id="meAvatarHome" alt="">
+        <span class="edit-dot"><img data-icon="pencil" alt=""></span>
+      </button>
+      <div class="hero-name"><img class="flag" id="meFlagHome" alt=""><span id="meNameHome"></span></div>
+      <div class="hero-rank" id="meRankRow"><img id="meBadge" class="badge" alt=""><span id="meRank"></span></div>
+      <div class="hero-elo"><span id="meElo">800</span><small>ELO</small></div>
+      <div class="xp">
+        <div class="xp-bar"><i id="xpFill"></i></div>
+        <div class="xp-txt"><span id="xpLeft"></span><span id="xpRight"></span></div>
       </div>
-      <canvas id="spark" width="96" height="28"></canvas>
+      <canvas id="spark" width="120" height="30"></canvas>
     </div>
 
     <div class="stats-row">
-      <div class="stat"><b id="stW">0</b><span>Victoires</span></div>
-      <div class="stat"><b id="stD">0</b><span>Nulles</span></div>
-      <div class="stat"><b id="stL">0</b><span>Défaites</span></div>
-      <div class="stat"><b id="stPeak">0</b><span>Record</span></div>
+      <div class="stat s-w"><b id="stW">0</b><span>Victoires</span></div>
+      <div class="stat s-d"><b id="stD">0</b><span>Nulles</span></div>
+      <div class="stat s-l"><b id="stL">0</b><span>Défaites</span></div>
+      <div class="stat s-p"><b id="stPeak">0</b><span>Record</span></div>
     </div>
 
-    <button id="resumeBtn" class="panel resume hidden">
-      <img data-icon="sword" alt="">
-      <div><b>Partie en cours</b><small id="resumeInfo"></small></div>
+    <button id="historyBtn" class="last-games">
+      <span class="lg-title">Dernières parties</span>
+      <span class="lg-dots" id="lastDots"></span>
+      <span class="lg-more">›</span>
     </button>
 
-    <div class="label">Cadence</div>
-    <div class="chips" id="tcChips"></div>
+    <!-- étagère décorative -->
+    <div class="shelf" id="shelf"></div>
 
-    <button id="rankedBtn" class="btn green big-btn"><img data-icon="sword" alt="">Jouer classé</button>
-    <button id="friendlyBtn" class="btn wood"><img data-icon="heart" alt="">Partie amicale</button>
+    <div class="play-zone">
+      <button id="resumeBtn" class="resume hidden">
+        <img data-icon="sword" alt="">
+        <div><b>Reprendre la partie</b><small id="resumeInfo"></small></div>
+        <span class="lg-more">›</span>
+      </button>
 
-    <div class="label">Parties récentes</div>
-    <div id="recent" class="recent"></div>
+      <div class="chips" id="tcChips"></div>
+
+      <button id="rankedBtn" class="btn green big-btn"><img data-icon="sword" alt="">Jouer classé</button>
+      <button id="friendlyBtn" class="btn blue"><img data-icon="heart" alt="">Partie amicale</button>
+    </div>
   </section>
 
   <!-- ================= RECHERCHE ================= -->
@@ -169,6 +182,14 @@
       </div>
       <button id="frPlay" class="btn green">Jouer</button>
       <button id="frCancel" class="link">Fermer</button>
+    </div>
+  </div>
+
+  <div id="historyModal" class="overlay hidden">
+    <div class="panel paper card tall">
+      <h3 class="ink">Historique</h3>
+      <div id="recent" class="recent"></div>
+      <button id="historyClose" class="btn wood">Fermer</button>
     </div>
   </div>
 

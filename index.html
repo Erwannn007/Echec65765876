@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <div id="ambBack" class="amb amb-back"></div>
 
   <!-- ================= ACCUEIL ================= -->
   <section id="home" class="screen active">
@@ -33,8 +34,8 @@
         <img class="av" id="meAvatarHome" alt="">
         <span class="edit-dot"><img data-icon="pencil" alt=""></span>
       </button>
-      <div class="hero-name"><img class="flag" id="meFlagHome" alt=""><span id="meNameHome"></span></div>
-      <div class="hero-rank" id="meRankRow"><img id="meBadge" class="badge" alt=""><span id="meRank"></span></div>
+      <div class="hero-name"><img class="flag" id="meFlagHome" alt=""><span id="meNameHome"></span>
+        <span class="hero-rank" id="meRankRow"><img id="meBadge" class="badge" alt=""><span id="meRank"></span></span></div>
       <div class="hero-elo"><span id="meElo">800</span><small>ELO</small></div>
       <div class="xp">
         <div class="xp-bar"><i id="xpFill"></i></div>
@@ -68,8 +69,48 @@
 
       <div class="chips" id="tcChips"></div>
 
-      <button id="rankedBtn" class="btn green big-btn"><img data-icon="sword" alt="">Jouer classé</button>
-      <button id="friendlyBtn" class="btn blue"><img data-icon="heart" alt="">Partie amicale</button>
+      <div class="play-row">
+        <button id="rankedBtn" class="btn green big-btn"><img data-icon="sword" alt="">Jouer classé</button>
+        <button id="friendlyBtn" class="btn blue friendly"><img data-icon="heart" alt=""><span>Amical</span></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= CRÉATION / ÉDITION DU JOUEUR ================= -->
+  <section id="setup" class="screen scroll">
+    <div class="setup-head">
+      <h1 class="setup-title"><img id="setupTitle" alt=""></h1>
+      <p class="setup-sub" id="setupSub">Crée ton joueur avant ta première partie</p>
+    </div>
+
+    <div class="av-stage felt">
+      <button class="arrow" id="avPrev" aria-label="Précédent"><img data-icon="left" alt=""></button>
+      <div class="av-pedestal">
+        <img id="pfAv" class="av" alt="">
+        <i class="pedestal"></i>
+      </div>
+      <button class="arrow" id="avNext" aria-label="Suivant"><img data-icon="right" alt=""></button>
+      <button class="dice" id="pfReroll" aria-label="Au hasard"><img data-icon="dice" alt=""></button>
+    </div>
+
+    <label class="plaque">
+      <span class="plaque-label">Pseudo</span>
+      <input id="pfName" maxlength="16" placeholder="Ton pseudo" autocomplete="off" autocapitalize="off" spellcheck="false">
+    </label>
+
+    <div class="setup-block">
+      <div class="label">Ton pays</div>
+      <div class="flag-pick" id="pfFlags"></div>
+    </div>
+
+    <div class="setup-block" id="pfLevel">
+      <div class="label">Ton niveau</div>
+      <div class="levels" id="pfLevels"></div>
+    </div>
+
+    <div class="setup-actions">
+      <button id="pfSave" class="btn green big-btn">C'est parti</button>
+      <button id="pfBack" class="link light hidden">Retour</button>
     </div>
   </section>
 
@@ -193,22 +234,7 @@
     </div>
   </div>
 
-  <div id="profileModal" class="overlay hidden">
-    <div class="panel paper card">
-      <h3 class="ink" id="profileTitle">Ton profil</h3>
-      <div class="av-edit">
-        <img class="av big" id="pfAv" alt="">
-        <button id="pfReroll" class="btn wood small">Autre tête</button>
-      </div>
-      <input id="pfName" class="input" maxlength="16" placeholder="Pseudo" autocomplete="off" autocapitalize="off" spellcheck="false">
-      <div class="flag-pick" id="pfFlags"></div>
-      <div id="pfLevel">
-        <p class="ink soft">Ton niveau actuel ?</p>
-        <div class="levels" id="pfLevels"></div>
-      </div>
-      <button id="pfSave" class="btn green">C'est parti</button>
-    </div>
-  </div>
+  <div id="ambFront" class="amb amb-front"></div>
 
   <script type="module" src="app.js"></script>
 </body>

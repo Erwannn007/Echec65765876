@@ -1,7 +1,8 @@
 import { Chess } from './lib/chess.js';
+import { initAmbience, setAmbience } from './ambience.js';
 import {
-  pieceSprite, boardImage, tableTexture, paperTexture, feltTexture, wordmark, avatar, flag, FLAG_CODES,
-  badge, rankOf, RANKS, icon, rng,
+  pieceSprite, boardImage, tableTexture, paperTexture, feltTexture, wordmark, pixelTitle, avatar, flag, FLAG_CODES,
+  badge, rankOf, RANKS, icon, rng, pottedPlant,
 } from './pixel.js';
 
 /* =========================================================
@@ -186,7 +187,21 @@ function makeOpponent(elo, seed = Math.floor(Math.random() * 1e9)) {
    ========================================================= */
 const $ = (id) => document.getElementById(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-function show(id) { document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id)); }
+function show(id) {
+  document.querySelectorAll('.screen').forEach((s) => {
+    const on = s.id === id;
+    if (on && !s.classList.contains('active')) [...s.children].forEach((c, i) => c.style.setProperty('--i', i));
+    s.classList.toggle('active', on);
+  });
+  setAmbience(id);
+}
+
+/* L'appli ne doit jamais glisser : on bloque le défilement, sauf dans les listes */
+document.addEventListener('touchmove', (e) => {
+  if (e.target.closest('.scroll, .recent, .moves, input[type=range]')) return;
+  e.preventDefault();
+}, { passive: false });
+document.addEventListener('gesturestart', (e) => e.preventDefault());
 function hydrateIcons(root = document) {
   root.querySelectorAll('[data-icon]').forEach((img) => { img.src = icon(img.dataset.icon); });
   root.querySelectorAll('[data-piece]').forEach((img) => { img.src = pieceSprite(img.dataset.piece[0], img.dataset.piece[1]); });
@@ -199,8 +214,11 @@ document.documentElement.style.setProperty('--plank', `url(${tableTexture(['#5b3
 document.documentElement.style.setProperty('--paper', `url(${paperTexture()})`);
 document.documentElement.style.setProperty('--felt', `url(${feltTexture()})`);
 $('wordmark').src = wordmark();
-$('shelf').innerHTML = [['b', 'p'], ['w', 'n'], ['b', 'q'], ['w', 'k'], ['b', 'b'], ['w', 'r'], ['b', 'p']]
-  .map(([c, t]) => `<img src="${pieceSprite(c, t)}" alt="">`).join('');
+$('shelf').innerHTML = `<img class="pot" src="${pottedPlant(1)}" alt="">` +
+  [['b', 'p'], ['w', 'n'], ['b', 'q'], ['w', 'k'], ['b', 'b'], ['w', 'r']]
+    .map(([c, t]) => `<img src="${pieceSprite(c, t)}" alt="">`).join('') +
+  `<img class="pot" src="${pottedPlant(7)}" alt="">`;
+initAmbience();
 hydrateIcons();
 
 /* =========================================================
@@ -235,8 +253,9 @@ function renderHome() {
   const save = store.get('px.save', null);
   if (save && !save.over && save.moves.length) {
     $('resumeBtn').classList.remove('hidden');
+    $('home').classList.add('has-resume');
     $('resumeInfo').textContent = `${save.mode === 'ranked' ? 'Classée' : 'Amicale'} contre ${save.opp.name} · coup ${Math.ceil(save.moves.length / 2)}`;
-  } else $('resumeBtn').classList.add('hidden');
+  } else { $('resumeBtn').classList.add('hidden'); $('home').classList.remove('has-resume'); }
 
   const last = history.slice(0, 8).reverse();
   $('lastDots').innerHTML = last.length ? last.map((h) => `<i class="${h.kind}"></i>`).join('') : '<em>aucune</em>';
@@ -296,42 +315,68 @@ $('onlineCount').textContent = online.toLocaleString('fr-FR');
    PROFIL
    ========================================================= */
 const LEVELS = [
-  { elo: 400, t: 'Débutant', s: 'Je découvre' },
-  { elo: 800, t: 'Amateur', s: 'Je connais les règles' },
-  { elo: 1200, t: 'Club', s: 'Je joue souvent' },
-  { elo: 1600, t: 'Confirmé', s: 'Je suis fort' },
+  { elo: 400, t: 'Débutant', s: 'Je découvre', p: 'p', c: '#8fd65a' },
+  { elo: 800, t: 'Amateur', s: 'Je connais les règles', p: 'n', c: '#7ab4ee' },
+  { elo: 1200, t: 'Club', s: 'Je joue souvent', p: 'r', c: '#f2b134' },
+  { elo: 1600, t: 'Confirmé', s: 'Je suis fort', p: 'q', c: '#ff8a7a' },
 ];
-let pfDraft = null;
+let pfDraft = null, pfFirst = false, avSeeds = [], avIdx = 0;
+const newSeed = () => String(Math.floor(Math.random() * 1e9));
 
 function openProfile(first) {
-  pfDraft = profile ? { ...profile } : { name: '', seed: String(Math.floor(Math.random() * 1e9)), flag: 'FR', elo: 800 };
-  $('profileTitle').textContent = first ? 'Bienvenue !' : 'Ton profil';
+  pfFirst = first;
+  pfDraft = profile ? { ...profile } : { name: '', seed: newSeed(), flag: 'FR', elo: 800 };
+  avSeeds = [pfDraft.seed]; avIdx = 0;
+  $('setupTitle').src = pixelTitle(first ? 'Bienvenue' : 'Ton profil');
+  $('setupSub').textContent = first ? 'Crée ton joueur avant ta première partie' : 'Change de tête, de pseudo ou de pays';
   $('pfLevel').classList.toggle('hidden', !first);
+  $('pfBack').classList.toggle('hidden', first);
   $('pfSave').textContent = first ? "C'est parti" : 'Enregistrer';
   $('pfName').value = pfDraft.name;
+  $('pfAv').src = avatar(pfDraft.seed);
   renderProfileDraft();
-  $('profileModal').classList.remove('hidden');
+  show('setup');
+}
+function setAvatar(seed) {
+  pfDraft.seed = seed;
+  const img = $('pfAv');
+  img.src = avatar(seed);
+  img.classList.remove('swap'); void img.offsetWidth; img.classList.add('swap');
+  Sound.unlock(); Sound.tick();
 }
 function renderProfileDraft() {
-  $('pfAv').src = avatar(pfDraft.seed);
   $('pfFlags').innerHTML = FLAG_CODES.map((c) => `<button data-f="${c}" class="${c === pfDraft.flag ? 'on' : ''}"><img src="${flag(c)}" alt="${c}"></button>`).join('');
-  $('pfFlags').querySelectorAll('button').forEach((b) => { b.onclick = () => { pfDraft.flag = b.dataset.f; renderProfileDraft(); }; });
-  $('pfLevels').innerHTML = LEVELS.map((l) => `<button data-e="${l.elo}" class="${l.elo === pfDraft.elo ? 'on' : ''}"><b>${l.t}</b>${l.s}</button>`).join('');
-  $('pfLevels').querySelectorAll('button').forEach((b) => { b.onclick = () => { pfDraft.elo = +b.dataset.e; renderProfileDraft(); }; });
+  $('pfFlags').querySelectorAll('button').forEach((b) => { b.onclick = () => { pfDraft.flag = b.dataset.f; Sound.unlock(); Sound.tick(); renderProfileDraft(); }; });
+  $('pfLevels').innerHTML = LEVELS.map((l) => `
+    <button data-e="${l.elo}" style="--c:${l.c}" class="${l.elo === pfDraft.elo ? 'on' : ''}">
+      <img src="${pieceSprite('w', l.p)}" alt=""><div><b>${l.t}</b><span>${l.s}</span></div>
+    </button>`).join('');
+  $('pfLevels').querySelectorAll('button').forEach((b) => { b.onclick = () => { pfDraft.elo = +b.dataset.e; Sound.unlock(); Sound.tick(); renderProfileDraft(); }; });
 }
-$('pfReroll').onclick = () => { Sound.unlock(); Sound.tick(); pfDraft.seed = String(Math.floor(Math.random() * 1e9)); renderProfileDraft(); };
+$('avNext').onclick = () => {
+  if (avIdx === avSeeds.length - 1) avSeeds.push(newSeed());
+  setAvatar(avSeeds[++avIdx]);
+};
+$('avPrev').onclick = () => {
+  if (avIdx === 0) { avSeeds.unshift(newSeed()); avIdx = 1; }
+  setAvatar(avSeeds[--avIdx]);
+};
+$('pfReroll').onclick = () => { avSeeds.push(newSeed()); avIdx = avSeeds.length - 1; setAvatar(avSeeds[avIdx]); };
+$('pfName').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
 $('pfSave').onclick = () => {
   Sound.unlock();
   const name = $('pfName').value.trim().slice(0, 16) || 'Joueur' + Math.floor(Math.random() * 900 + 100);
   if (!profile) {
     profile = { name, seed: pfDraft.seed, flag: pfDraft.flag, elo: pfDraft.elo, peak: pfDraft.elo, games: 0, w: 0, l: 0, d: 0, ratings: [pfDraft.elo] };
+    Sound.found();
   } else {
     Object.assign(profile, { name, seed: pfDraft.seed, flag: pfDraft.flag });
   }
   store.set('px.profile', profile);
-  $('profileModal').classList.add('hidden');
   renderHome();
+  show('home');
 };
+$('pfBack').onclick = () => { renderHome(); show('home'); };
 $('meAvatarBtn').onclick = () => openProfile(false);
 
 /* =========================================================
@@ -1056,7 +1101,7 @@ $('frPlay').onclick = () => {
    DÉMARRAGE
    ========================================================= */
 if (!profile) openProfile(true);
-else renderHome();
+else { renderHome(); show('home'); }
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));

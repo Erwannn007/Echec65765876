@@ -449,6 +449,9 @@ const ICONS = {
   mute:   ['....o....', '...oo....', 'ooooo.o.o', 'ooooo..o.', 'ooooo.o.o', '...oo....', '....o....', '.........', '.........'],
   sword:  ['.......oo', '......ooo', '.....ooo.', 'o...ooo..', '.o.ooo...', '..ooo....', '.ooo.....', 'oo.o.....', 'o...o....'],
   heart:  ['.........', '.oo...oo.', 'oooo.oooo', 'ooooooooo', 'ooooooooo', '.ooooooo.', '..ooooo..', '...ooo...', '....o....'],
+  left:   ['.....o...', '....oo...', '...ooo...', '..oooo...', '.ooooo...', '..oooo...', '...ooo...', '....oo...', '.....o...'],
+  right:  ['...o.....', '...oo....', '...ooo...', '...oooo..', '...ooooo.', '...oooo..', '...ooo...', '...oo....', '...o.....'],
+  dice:   ['ooooooooo', 'o.ooooo.o', 'ooooooooo', 'ooooooooo', 'oooo.oooo', 'ooooooooo', 'ooooooooo', 'o.ooooo.o', 'ooooooooo'],
   pencil: ['......oo.', '.....oooo', '....oooo.', '...oooo..', '..oooo...', '.oooo....', '.ooo.....', 'oo.......', '.........'],
 };
 const iconCache = new Map();
@@ -475,31 +478,167 @@ export function feltTexture() {
 
 /* Titre « ÉCHECS » en lettres pixel 5×7 dorées */
 const LETTERS = {
-  E: ['xxxxx', 'x....', 'x....', 'xxxx.', 'x....', 'x....', 'xxxxx'],
+  A: ['.xxx.', 'x...x', 'x...x', 'xxxxx', 'x...x', 'x...x', 'x...x'],
+  B: ['xxxx.', 'x...x', 'x...x', 'xxxx.', 'x...x', 'x...x', 'xxxx.'],
   C: ['.xxxx', 'x....', 'x....', 'x....', 'x....', 'x....', '.xxxx'],
+  D: ['xxxx.', 'x...x', 'x...x', 'x...x', 'x...x', 'x...x', 'xxxx.'],
+  E: ['xxxxx', 'x....', 'x....', 'xxxx.', 'x....', 'x....', 'xxxxx'],
+  F: ['xxxxx', 'x....', 'x....', 'xxxx.', 'x....', 'x....', 'x....'],
+  G: ['.xxxx', 'x....', 'x....', 'x.xxx', 'x...x', 'x...x', '.xxxx'],
   H: ['x...x', 'x...x', 'x...x', 'xxxxx', 'x...x', 'x...x', 'x...x'],
+  I: ['xxxxx', '..x..', '..x..', '..x..', '..x..', '..x..', 'xxxxx'],
+  L: ['x....', 'x....', 'x....', 'x....', 'x....', 'x....', 'xxxxx'],
+  M: ['x...x', 'xx.xx', 'x.x.x', 'x.x.x', 'x...x', 'x...x', 'x...x'],
+  N: ['x...x', 'xx..x', 'x.x.x', 'x..xx', 'x...x', 'x...x', 'x...x'],
+  O: ['.xxx.', 'x...x', 'x...x', 'x...x', 'x...x', 'x...x', '.xxx.'],
+  P: ['xxxx.', 'x...x', 'x...x', 'xxxx.', 'x....', 'x....', 'x....'],
+  R: ['xxxx.', 'x...x', 'x...x', 'xxxx.', 'x.x..', 'x..x.', 'x...x'],
   S: ['.xxxx', 'x....', 'x....', '.xxx.', '....x', '....x', 'xxxx.'],
+  T: ['xxxxx', '..x..', '..x..', '..x..', '..x..', '..x..', '..x..'],
+  U: ['x...x', 'x...x', 'x...x', 'x...x', 'x...x', 'x...x', '.xxx.'],
+  V: ['x...x', 'x...x', 'x...x', 'x...x', '.x.x.', '.x.x.', '..x..'],
+  ' ': ['...', '...', '...', '...', '...', '...', '...'],
+  '!': ['x', 'x', 'x', 'x', 'x', '.', 'x'],
 };
-export function wordmark() {
-  const word = 'ECHECS';
-  const W = word.length * 6 - 1, H = 10;
+const ACCENT = { 'É': 'E' };
+
+/* Texte pixel doré avec contour et ombre (titres) */
+export function pixelTitle(text) {
+  const chars = [...text.toUpperCase()];
+  const widths = chars.map((ch) => (LETTERS[ACCENT[ch] || ch] || LETTERS[' '])[0].length);
+  const W = widths.reduce((a, b) => a + b + 1, -1), H = 10;
   const M = Array.from({ length: H }, () => Array(W).fill(0));
-  [...word].forEach((ch, i) => LETTERS[ch].forEach((row, y) => [...row].forEach((v, x) => { if (v === 'x') M[y + 3][i * 6 + x] = 1; })));
-  M[0][3] = 1; M[1][2] = 1; // accent du É
+  let ox = 0;
+  chars.forEach((ch, i) => {
+    const g = LETTERS[ACCENT[ch] || ch] || LETTERS[' '];
+    g.forEach((row, y) => [...row].forEach((v, x) => { if (v === 'x') M[y + 3][ox + x] = 1; }));
+    if (ACCENT[ch]) { M[0][ox + 3] = 1; M[1][ox + 2] = 1; }
+    ox += widths[i] + 1;
+  });
   const pad = 2;
   const [c, ctx] = canvas(W + pad * 2 + 1, H + pad * 2 + 2);
   const on = (x, y) => M[y]?.[x] === 1;
-  // ombre portée
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (on(x, y)) px(ctx, x + pad + 1, y + pad + 3, '#1a0c04', 1, 1);
-  // contour
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (on(x, y)) px(ctx, x + pad + 1, y + pad + 3, '#1a0c04');
   for (let y = -1; y <= H; y++) for (let x = -1; x <= W; x++) {
     if (on(x, y)) continue;
     let n = false;
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (on(x + dx, y + dy)) n = true;
     if (n) { px(ctx, x + pad, y + pad, '#3a1e08'); px(ctx, x + pad, y + pad + 1, '#3a1e08'); }
   }
-  // lettres : dégradé or
   const ramp = ['#ffe9a0', '#ffe9a0', '#ffd56a', '#ffd56a', '#f2b134', '#f2b134', '#f2b134', '#d99520', '#b07a18', '#b07a18'];
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (on(x, y)) px(ctx, x + pad, y + pad, ramp[y]);
+  return c.toDataURL();
+}
+
+export const wordmark = () => pixelTitle('ÉCHECS');
+
+/* =========================================================
+   AMBIANCE : lianes, lampe, plantes en pot, feuilles
+   ========================================================= */
+const LEAF_R = ['.GGG.', 'GgggG', '.GG..'];
+const GREENS = { G: '#2f6b2a', g: '#6fb84a', h: '#9be06a', s: '#1e4a1c' };
+function stamp(ctx, pattern, x, y, map, mirror = false) {
+  pattern.forEach((row, j) => [...row].forEach((ch, i) => {
+    if (map[ch]) px(ctx, x + (mirror ? row.length - 1 - i : i), y + j, map[ch]);
+  }));
+}
+
+/* Liane suspendue : tige ondulante, feuilles alternées, parfois une fleur */
+export function vine(seed, h) {
+  const R = rng('vine' + seed);
+  const W = 20;
+  const [c, ctx] = canvas(W, h);
+  const ph = R() * 6;
+  const xs = [];
+  for (let y = 0; y < h; y++) {
+    const x = Math.round(W / 2 + Math.sin(y * 0.16 + ph) * 3 + Math.sin(y * 0.05) * 1.5);
+    xs.push(x);
+    px(ctx, x, y, '#2a5a1e');
+    px(ctx, x + 1, y, y % 5 === 0 ? '#3f7a2a' : '#2a5a1e');
+  }
+  let side = R() < 0.5;
+  for (let y = 3 + Math.floor(R() * 3); y < h - 3; y += 4 + Math.floor(R() * 4)) {
+    const x = xs[y];
+    const map = { G: GREENS.G, g: R() < 0.3 ? GREENS.h : GREENS.g };
+    if (side) stamp(ctx, LEAF_R, x + 2, y - 1, map);
+    else stamp(ctx, LEAF_R, x - 5, y - 1, map, true);
+    side = !side;
+  }
+  // bout recourbé
+  const xe = xs[h - 1];
+  px(ctx, xe - 1, h - 2, GREENS.G); px(ctx, xe - 2, h - 3, GREENS.g);
+  // petites fleurs
+  if (R() < 0.7) {
+    const fy = Math.floor(h * (0.4 + R() * 0.4)), fx = xs[fy] + (R() < 0.5 ? -3 : 3);
+    const col = ['#f29ab8', '#f2e06a', '#d0a0ff', '#ffffff'][Math.floor(R() * 4)];
+    px(ctx, fx, fy - 1, col); px(ctx, fx - 1, fy, col); px(ctx, fx + 1, fy, col); px(ctx, fx, fy + 1, col); px(ctx, fx, fy, '#f2b134');
+  }
+  return c.toDataURL();
+}
+
+/* Feuille qui tombe */
+export function leafSprite(light = false) {
+  const [c, ctx] = canvas(5, 3);
+  stamp(ctx, LEAF_R, 0, 0, { G: GREENS.G, g: light ? GREENS.h : GREENS.g });
+  return c.toDataURL();
+}
+
+/* Lampe suspendue (abat-jour vert, rebord laiton, ampoule chaude) */
+export function lamp() {
+  const W = 40, H = 24;
+  const [c, ctx] = canvas(W, H);
+  const cx = W / 2;
+  px(ctx, cx - 3, 0, '#8a6a2a', 6, 3);           // douille
+  px(ctx, cx - 3, 0, '#c9932e', 2, 3);
+  for (let y = 3; y < 16; y++) {
+    const half = Math.round(5 + (y - 3) * 1.15);
+    for (let x = cx - half; x < cx + half; x++) {
+      const t = (x - (cx - half)) / (half * 2);
+      let col = t < 0.15 ? '#5f9a6a' : t < 0.35 ? '#3f7a4a' : t > 0.85 ? '#1c3a24' : '#2d5a3a';
+      if (x === cx - half || x === cx + half - 1) col = '#0f2414';
+      px(ctx, x, y, col);
+    }
+  }
+  px(ctx, cx - 5, 3, '#0f2414', 10, 1);
+  for (let x = 0; x < W; x++) { // rebord laiton
+    const inShade = Math.abs(x + 0.5 - cx) < 20;
+    if (!inShade) continue;
+    px(ctx, x, 16, x < cx - 10 ? '#ffd56a' : '#c9932e');
+    px(ctx, x, 17, '#8a5a1a');
+  }
+  // ampoule
+  px(ctx, cx - 4, 18, '#ffd56a', 8, 1);
+  px(ctx, cx - 5, 19, '#fff4c0', 10, 2);
+  px(ctx, cx - 4, 21, '#fff4c0', 8, 1);
+  px(ctx, cx - 3, 22, '#ffd56a', 6, 1);
+  px(ctx, cx - 3, 19, '#ffffff', 3, 1);
+  return c.toDataURL();
+}
+
+/* Plante en pot (pour l'étagère) */
+export function pottedPlant(seed = 1) {
+  const R = rng('pot' + seed);
+  const [c, ctx] = canvas(18, 22);
+  // feuilles en éventail
+  const stems = 5 + Math.floor(R() * 3);
+  for (let i = 0; i < stems; i++) {
+    const ang = -Math.PI / 2 + (i / (stems - 1) - 0.5) * 2.3;
+    const len = 7 + R() * 5;
+    for (let t = 0; t < len; t++) {
+      const x = Math.round(9 + Math.cos(ang) * t), y = Math.round(13 + Math.sin(ang) * t + (t * t) / 28);
+      px(ctx, x, y, t > len - 3 ? GREENS.h : t % 3 === 0 ? GREENS.G : GREENS.g);
+      if (t > 2 && t < len - 1) px(ctx, x + (ang < -Math.PI / 2 ? -1 : 1), y, GREENS.G);
+    }
+  }
+  // pot en terre cuite
+  px(ctx, 4, 13, '#3a1a0a', 10, 1);
+  px(ctx, 4, 14, '#e08a5a', 10, 2);
+  px(ctx, 4, 14, '#f2a67a', 2, 2);
+  for (let y = 16; y < 22; y++) {
+    const inset = Math.floor((y - 16) / 3);
+    px(ctx, 5 + inset, y, '#c0643a', 8 - inset * 2, 1);
+    px(ctx, 5 + inset, y, '#d9824e', 2, 1);
+    px(ctx, 11 - inset, y, '#8a4024', 2, 1);
+  }
   return c.toDataURL();
 }

@@ -461,6 +461,21 @@ const ICONS = {
   right:  ['...o.....', '...oo....', '...ooo...', '...oooo..', '...ooooo.', '...oooo..', '...ooo...', '...oo....', '...o.....'],
   dice:   ['ooooooooo', 'o.ooooo.o', 'ooooooooo', 'ooooooooo', 'oooo.oooo', 'ooooooooo', 'ooooooooo', 'o.ooooo.o', 'ooooooooo'],
   pencil: ['......oo.', '.....oooo', '....oooo.', '...oooo..', '..oooo...', '.oooo....', '.ooo.....', 'oo.......', '.........'],
+  // --- Croisade : techniques et reliques ---
+  snow:   ['....o....', '.o..o..o.', '..o.o.o..', '...ooo...', 'ooooooooo', '...ooo...', '..o.o.o..', '.o..o..o.', '....o....'],
+  plus:   ['.........', '...ooo...', '...ooo...', '.ooooooo.', '.ooooooo.', '.ooooooo.', '...ooo...', '...ooo...', '.........'],
+  up:     ['....o....', '...ooo...', '..ooooo..', '.ooooooo.', '...ooo...', '...ooo...', '...ooo...', '...ooo...', '.........'],
+  swap:   ['..o......', '.oo......', 'ooooooo..', '.oo......', '..o...o..', '......oo.', '..ooooooo', '......oo.', '......o..'],
+  bolt:   ['.....ooo.', '....ooo..', '...ooo...', '..oooooo.', '....ooo..', '...ooo...', '..oo.....', '.oo......', 'o........'],
+  coin:   ['..ooooo..', '.ooooooo.', 'ooo.o.ooo', 'ooo.o.ooo', 'ooo.o.ooo', 'ooo.o.ooo', 'ooo.o.ooo', '.ooooooo.', '..ooooo..'],
+  bag:    ['...ooo...', '....o....', '..ooooo..', '.ooooooo.', 'ooooooooo', 'ooooooooo', 'ooooooooo', '.ooooooo.', '..ooooo..'],
+  eye:    ['.........', '..ooooo..', '.o.....o.', 'o..ooo..o', 'o..ooo..o', 'o..ooo..o', '.o.....o.', '..ooooo..', '.........'],
+  tent:   ['....o....', '...ooo...', '..ooooo..', '.ooo.ooo.', '.oo...oo.', 'ooo...ooo', 'oo.....oo', 'ooooooooo', '.........'],
+  hourglass: ['ooooooooo', '.o.....o.', '..ooooo..', '...ooo...', '....o....', '...o.o...', '..o.o.o..', '.ooooooo.', 'ooooooooo'],
+  tag:    ['oooooo...', 'o....oo..', 'o.oo..oo.', 'o.oo...oo', 'o......oo', 'o.....oo.', 'o....oo..', 'oooooo...', '.........'],
+  bomb:   ['.......o.', '......o..', '...ooo...', '..ooooo..', '.oo.oooo.', '.o.ooooo.', '.ooooooo.', '..ooooo..', '...ooo...'],
+  crown:  ['.........', 'o...o...o', 'oo.ooo.oo', 'ooooooooo', 'ooooooooo', 'ooooooooo', '.........', 'ooooooooo', '.........'],
+  skull:  ['..ooooo..', '.ooooooo.', 'ooooooooo', 'o..ooo..o', 'o..ooo..o', 'ooooooooo', '.ooo.ooo.', '..ooooo..', '..o.o.o..'],
 };
 const iconCache = new Map();
 export function icon(name, col = '#f3e2c0') {

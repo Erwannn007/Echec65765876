@@ -1,5 +1,6 @@
 import { Chess } from './lib/chess.js';
 import { initAmbience, setAmbience } from './ambience.js';
+import * as RL from './roguelike.js';
 import {
   pieceSprite, boardImage, tableTexture, paperTexture, feltTexture, wordmark, pixelTitle, avatar, flag, FLAG_CODES,
   badge, rankOf, RANKS, icon, rng, pottedPlant,
@@ -155,6 +156,8 @@ let profile = store.get('px.profile', null);
 let history = store.get('px.history', []);
 let tcId = store.get('px.tc', '5+0');
 let frColor = store.get('px.frColor', 'w');
+let R = store.get('px.run', null);   // croisade en cours (mode roguelike)
+const saveRun = () => { if (R) store.set('px.run', R); };
 Sound.on = store.get('px.sound', true);
 
 /* ---------- Adversaires générés ---------- */
@@ -243,6 +246,7 @@ function renderHome() {
   $('stPeak').textContent = profile.peak;
   $('homeSoundIcon').src = icon(Sound.on ? 'sound' : 'mute');
   drawSpark();
+  renderRunButton();
 
   $('tcChips').innerHTML = TCS.map((t) =>
     `<button class="chip${t.id === tcId ? ' on' : ''}" style="--c:${t.col}" data-tc="${t.id}">${t.id}<small>${t.label}</small></button>`).join('');
@@ -390,6 +394,7 @@ let selected = null, targets = [], lastMove = null, hintMove = null;
 let gen = 0, thinking = false, paused = true, clockLast = 0;
 let botBad = 0, lastDrawOffer = -99;
 let strengthCfg = null;
+let targeting = null;      // technique en attente d'une case (croisade)
 
 const myColor = () => G.color;
 const botColor = () => (G.color === 'w' ? 'b' : 'w');
@@ -399,6 +404,13 @@ const uciToObj = (u) => ({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[
 
 function persist() {
   if (!G) return;
+  if (G.mode === 'run') {
+    if (G.over || !R) return;
+    G.fen = game.fen();
+    R.fight = G;
+    saveRun();
+    return;
+  }
   commitClock();
   G.moves = game.history({ verbose: true }).map((m) => m.from + m.to + (m.promotion || ''));
   store.set('px.save', G);
@@ -483,6 +495,10 @@ function enterGame() {
   selected = null; targets = []; hintMove = null; botBad = 0; lastDrawOffer = -99;
   const h = game.history({ verbose: true });
   lastMove = h.length ? { from: h.at(-1).from, to: h.at(-1).to } : null;
+  const run = G.mode === 'run';
+  if (run) lastMove = G.last || null;
+  targeting = null;
+  $('techBanner').classList.add('hidden');
   thinking = false;
   $('thinking').classList.remove('on');
   ['resultModal', 'confirmModal', 'friendlyModal'].forEach((id) => $(id).classList.add('hidden'));
@@ -490,9 +506,13 @@ function enterGame() {
   $('bubble').classList.add('hidden');
 
   const ranked = G.mode === 'ranked';
-  $('modeLabel').innerHTML = `${ranked ? '<b>Classée</b>' : '<b>Amicale</b>'} · ${G.tcId === '∞' ? 'sans pendule' : G.tcId}`;
+  $('modeLabel').innerHTML = run
+    ? `<b>Croisade</b> · ${RL.isBoss(G.floor) ? 'Boss' : `étage ${G.floor + 1}/${RL.FLOORS}`}${G.kind === 'elite' ? ' · Élite' : ''}`
+    : `${ranked ? '<b>Classée</b>' : '<b>Amicale</b>'} · ${G.tcId === '∞' ? 'sans pendule' : G.tcId}`;
   $('undoBtn').classList.toggle('hidden', ranked);
   $('hintBtn').classList.toggle('hidden', ranked);
+  $('actions').classList.toggle('hidden', run);
+  $('runActions').classList.toggle('hidden', !run);
 
   $('oppAv').src = avatar(G.opp.seed);
   $('oppFlag').src = flag(G.opp.flag);
@@ -569,6 +589,7 @@ function render() {
   $('drawBtn').disabled = !myTurn || thinking;
   $('resignBtn').disabled = !!G.over;
   $('soundIcon').src = icon(Sound.on ? 'sound' : 'mute');
+  if (G.mode === 'run') renderTechs();
 }
 
 function renderCaptured() {
@@ -582,8 +603,9 @@ function renderCaptured() {
   const html = (cap) => {
     const vic = cap === 'w' ? 'b' : 'w';
     let s = '';
+    const start = G.start ? G.start[vic] : START_COUNT;
     for (const t of ['q', 'r', 'b', 'n', 'p']) {
-      const miss = Math.max(0, START_COUNT[t] - count[vic][t]);
+      const miss = Math.max(0, (start[t] || 0) - count[vic][t]);
       for (let i = 0; i < miss; i++) s += `<img src="${pieceSprite(vic, t)}" alt="">`;
     }
     const adv = mat[cap] - mat[vic];
@@ -595,7 +617,7 @@ function renderCaptured() {
 }
 
 function renderMoves() {
-  const h = game.history();
+  const h = G.mode === 'run' ? G.sans : game.history();
   let s = '';
   h.forEach((m, i) => {
     if (i % 2 === 0) s += `<span class="n">${i / 2 + 1}.</span>`;
@@ -669,6 +691,7 @@ $('board').addEventListener('pointerdown', (e) => {
   Sound.unlock();
   const sq = sqFromPoint(e.clientX, e.clientY);
   if (!sq || !canInteract()) return;
+  if (targeting) { techTarget(sq); return; }
   const p = game.get(sq);
   if (selected && targets.includes(sq)) { const from = selected; select(null); tryMove(from, sq, true); return; }
   if (p && p.color === myColor()) {
@@ -740,8 +763,11 @@ function askPromotion(color) {
 function doMove(m, animate) {
   const before = game.history().length;
   commitClock();
+  const run = G.mode === 'run';
+  if (run && game.turn() === myColor()) pushSnap();
   let mv;
-  try { mv = game.move(m); } catch { return null; }
+  try { mv = game.move(m); } catch { if (run && game.turn() === myColor()) G.snaps.pop(); return null; }
+  if (run) trackMove(mv);
   if (G.tc && before >= 2) G.clock[mv.color] += G.tc.inc * 1000;
   clockLast = performance.now();
   lastMove = { from: mv.from, to: mv.to };
@@ -792,6 +818,7 @@ function humanThinkTime() {
 
 async function maybeBotMove() {
   if (!G || G.over || game.turn() === myColor()) return;
+  if (G.mode === 'run' && G.freeze) { if (applyFreeze()) return; }
   const token = ++gen;
   thinking = true;
   $('thinking').classList.add('on');
@@ -805,7 +832,9 @@ async function maybeBotMove() {
   if (token !== gen) return;
 
   // le bot abandonne quand c'est vraiment perdu (comme un humain)
-  if (result && G.mode === 'ranked' && game.history().length > 30 && G.opp.elo > 900) {
+  const resignOk = G.mode === 'ranked' ? game.history().length > 30 && G.opp.elo > 900
+    : G.mode === 'run' ? G.sans.length > 14 : false;
+  if (result && resignOk) {
     botBad = result.score < -900 ? botBad + 1 : 0;
     if (botBad >= 2 && Math.random() < 0.6) {
       await sleep(900);
@@ -870,6 +899,7 @@ function applyResult(g, kind) {
 
 function finish(res) {
   if (G.over) return;
+  if (G.mode === 'run') { finishRun(res); return; }
   commitClock();
   G.over = res.kind;
   gen++;
@@ -893,6 +923,7 @@ function showResult(res, r) {
   rb.style.setProperty('--rb', { w: 'var(--green)', l: 'var(--red)', d: '#8a7a64' }[res.kind]);
   $('resultText').textContent = res.text;
   const ranked = G.mode === 'ranked';
+  setRunResultButtons(false);
   $('eloChange').classList.toggle('hidden', !ranked);
   $('rankUp').classList.add('hidden');
   $('newGameBtn').textContent = ranked ? 'Nouvel adversaire' : 'Changer de niveau';
@@ -932,6 +963,7 @@ function leaveGame() {
   thinking = false;
   $('thinking').classList.remove('on');
   persist();
+  if (G && G.mode === 'run') { openRun(); return; }
   renderHome();
   show('home');
 }
@@ -1014,7 +1046,11 @@ $('newGameBtn').onclick = () => {
   if (G.mode === 'ranked') startRanked(); else { leaveGame(); openFriendly(); }
 };
 $('reviewBtn').onclick = () => $('resultModal').classList.add('hidden');
-$('homeBtn').onclick = () => { $('resultModal').classList.add('hidden'); leaveGame(); };
+$('homeBtn').onclick = () => {
+  $('resultModal').classList.add('hidden');
+  if (G.mode === 'run') { gen++; engine.stop(); paused = true; G = null; renderHome(); show('home'); return; }
+  leaveGame();
+};
 
 /* =========================================================
    MATCHMAKING (classé)
@@ -1096,6 +1132,541 @@ $('frPlay').onclick = () => {
   const color = frColor === 'r' ? (Math.random() < 0.5 ? 'w' : 'b') : frColor;
   newGame({ mode: 'friendly', opp: { ...frOpp }, color, tc });
 };
+
+
+/* =========================================================
+   CROISADE (mode roguelike)
+   ========================================================= */
+let toastTimer;
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  t.style.animation = 'none'; void t.offsetWidth; t.style.animation = '';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.add('hidden'), 2400);
+}
+const coin = (n) => `<span class="coin"><img src="${icon('coin', '#f2c94c')}" alt="">${n}</span>`;
+const itemIcon = (it) => it.kind === 'piece' ? pieceSprite('w', it.id)
+  : it.kind === 'tech' ? icon(RL.TECHS[it.id].icon, RL.TECHS[it.id].col) : icon(RL.RELICS[it.id].icon, RL.RELICS[it.id].col);
+const countTypes = (units) => {
+  const c = { p: 0, n: 0, b: 0, r: 0, q: 0 };
+  for (const u of units) if (u.t !== 'k') c[u.t]++;
+  return c;
+};
+const armyStrip = (units, color) => ['q', 'r', 'b', 'n', 'p']
+  .flatMap((t) => units.filter((u) => u.t === t).map(() => `<img src="${pieceSprite(color, t)}" alt="">`)).join('');
+
+/* ---------- Accueil : bouton + fenêtre de présentation ---------- */
+function renderRunButton() {
+  const sub = $('runBtnSub');
+  if (R && !R.over) sub.textContent = R.fight ? 'Combat en cours' : `Étage ${R.floor + 1}/${RL.FLOORS} · ${R.gold} or`;
+  else sub.textContent = 'Mode roguelike';
+}
+$('runBtn').onclick = () => {
+  Sound.unlock(); Sound.tick();
+  if (R && R.over) { showRunEnd(); return; }
+  if (R) { openRun(); return; }
+  const best = store.get('px.runBest', null);
+  $('runBest').textContent = best ? `Record : étage ${best.floor}/${RL.FLOORS}${best.won ? ' · Roi Noir vaincu !' : ''}` : '';
+  $('runModal').classList.remove('hidden');
+};
+$('runModalClose').onclick = () => $('runModal').classList.add('hidden');
+$('runStartBtn').onclick = () => {
+  $('runModal').classList.add('hidden');
+  R = RL.newRun(profile.elo);
+  saveRun();
+  Sound.found();
+  openRun();
+};
+
+/* ---------- Le camp ---------- */
+let formSel = null;
+function openRun() {
+  formSel = null;
+  renderRun();
+  show('run');
+  if (R.pending) setTimeout(openLoot, 350);
+}
+$('runBackBtn').onclick = () => { renderHome(); show('home'); };
+$('runResumeBtn').onclick = () => {
+  if (!R.fight) return;
+  G = R.fight;
+  game = new Chess(G.fen);
+  enterGame();
+};
+$('runQuitBtn').onclick = async () => {
+  const ok = await confirmBox('Abandonner la croisade ?', 'Ton armée et ton or seront perdus.');
+  if (!ok) return;
+  R.fight = null;
+  R.over = 'l';
+  saveRun();
+  showRunEnd();
+};
+
+function renderRun() {
+  const fighting = !!R.fight;
+  $('runFloor').textContent = RL.isBoss(R.floor) ? 'Boss final' : `étage ${R.floor + 1}/${RL.FLOORS}`;
+  $('runGold').innerHTML = coin(R.gold);
+
+  // progression
+  let tr = '';
+  for (let i = 0; i < RL.FLOORS; i++) {
+    const cls = i < R.floor ? 'done' : i === R.floor ? 'cur' : '';
+    const boss = RL.isBoss(i);
+    tr += `${i ? '<i class="link-line"></i>' : ''}<span class="node ${cls}${boss ? ' boss' : ''}">${boss ? `<img src="${icon('crown', i <= R.floor ? '#1a0f08' : '#f2b134')}" alt="">` : i + 1}</span>`;
+  }
+  $('runTrack').innerHTML = tr;
+
+  // formation (rangée 2 en haut, rangée 1 en bas, comme sur l'échiquier)
+  $('runCount').textContent = `${R.army.length - 1}/${RL.MAX_UNITS}`;
+  let f = '';
+  for (const rank of ['2', '1']) for (const file of 'abcdefgh') {
+    const sq = file + rank;
+    const u = R.army.find((x) => x.sq === sq);
+    const light = (file.charCodeAt(0) - 97 + +rank) % 2 === 1;
+    f += `<button class="fcell ${light ? 'l' : 'd'}${formSel === sq ? ' sel' : ''}" data-sq="${sq}">${u ? `<img src="${pieceSprite('w', u.t)}" alt="">` : ''}</button>`;
+  }
+  $('formation').innerHTML = f;
+  $('formation').classList.toggle('locked', fighting);
+  $('formTip').textContent = fighting ? 'Formation verrouillée pendant le combat.' : 'Touche une pièce puis une case pour réorganiser ta formation.';
+
+  // techniques
+  const techs = Object.keys(RL.TECHS).filter((k) => R.techs[k] > 0);
+  $('runTechs').innerHTML = techs.length ? techs.map((k) => {
+    const T = RL.TECHS[k];
+    return `<button class="inv-chip" data-tech="${k}" style="--c:${T.col}"><img src="${icon(T.icon, T.col)}" alt="">${T.name}<b>×${R.techs[k]}</b></button>`;
+  }).join('') : '<span class="inv-empty">Aucune technique</span>';
+  $('runRelics').innerHTML = R.relics.length ? R.relics.map((k) => {
+    const T = RL.RELICS[k];
+    return `<button class="inv-chip" data-relic="${k}" style="--c:${T.col}"><img src="${icon(T.icon, T.col)}" alt="">${T.name}</button>`;
+  }).join('') : '<span class="inv-empty">Aucune relique pour l\'instant</span>';
+
+  // marché
+  $('runShopBlock').classList.toggle('hidden', fighting);
+  $('runShop').innerHTML = R.shop.map((it, i) => {
+    const price = RL.priceOf(R, it);
+    const poor = R.gold < price;
+    return `<button class="shop-item ${it.kind}${it.sold ? ' sold' : ''}${poor && !it.sold ? ' poor' : ''}" data-i="${i}">
+      <img class="ic" src="${itemIcon(it)}" alt="">
+      <b>${RL.itemName(it)}</b>
+      <small>${RL.itemDesc(it)}</small>
+      <span class="price">${it.sold ? 'Acheté' : coin(price)}</span>
+    </button>`;
+  }).join('');
+
+  // adversaires
+  $('runFoesBlock').classList.toggle('hidden', fighting);
+  $('runResumeBtn').classList.toggle('hidden', !fighting);
+  $('runFoesLabel').textContent = R.foes.length > 1 ? 'Choisis ton prochain combat' : 'Combat final';
+  $('runFoes').innerHTML = R.foes.map((foe, i) => {
+    const elo = RL.foeElo(R, R.floor, foe.kind);
+    const opp = makeOpponent(elo, foe.seed);
+    const units = RL.enemyArmy(R, R.floor, foe.kind, foe.seed);
+    const label = { normal: 'Combat', elite: 'Élite', boss: 'Le Roi Noir' }[foe.kind];
+    const reward = foe.kind === 'boss' ? 'Victoire finale' : `${coin(RL.foeReward(R, R.floor, foe.kind))}${foe.kind === 'elite' ? ' + relique probable' : ''}`;
+    return `<div class="foe ${foe.kind}">
+      <div class="foe-head"><img class="av" src="${avatar(opp.seed)}" alt="">
+        <div class="foe-who"><span class="tagk">${label}</span><b>${esc(opp.name)}</b><small>${elo} Elo · ${RL.armyPoints(units)} pts</small></div></div>
+      <div class="foe-army">${armyStrip(units, 'b')}</div>
+      <div class="foe-reward">${reward}</div>
+      <button class="btn ${foe.kind === 'normal' ? 'green' : 'red'} small foe-go" data-i="${i}"><img data-icon="sword" alt="">Combattre</button>
+    </div>`;
+  }).join('');
+  hydrateIcons($('runFoes'));
+}
+
+$('formation').onclick = (e) => {
+  const b = e.target.closest('.fcell');
+  if (!b || R.fight) return;
+  const sq = b.dataset.sq;
+  const has = R.army.some((u) => u.sq === sq);
+  if (!formSel) { if (has) { formSel = sq; Sound.tick(); } }
+  else if (formSel === sq) formSel = null;
+  else {
+    if (RL.swapFormation(R, formSel, sq)) { Sound.move(); saveRun(); }
+    else toast('Les pions doivent rester sur la 2e rangée.');
+    formSel = null;
+  }
+  renderRun();
+};
+$('runTechs').onclick = (e) => { const b = e.target.closest('[data-tech]'); if (b) toast(`${RL.TECHS[b.dataset.tech].name} : ${RL.TECHS[b.dataset.tech].desc}`); };
+$('runRelics').onclick = (e) => { const b = e.target.closest('[data-relic]'); if (b) toast(`${RL.RELICS[b.dataset.relic].name} : ${RL.RELICS[b.dataset.relic].desc}`); };
+$('runShop').onclick = (e) => {
+  const b = e.target.closest('.shop-item');
+  if (!b) return;
+  const it = R.shop[+b.dataset.i];
+  if (it.sold) return;
+  const price = RL.priceOf(R, it);
+  if (R.gold < price) { toast("Pas assez d'or."); return; }
+  const err = RL.grant(R, it);
+  if (err) { toast(err); return; }
+  R.gold -= price;
+  it.sold = true;
+  saveRun();
+  Sound.found();
+  renderRun();
+};
+$('runFoes').onclick = (e) => {
+  const b = e.target.closest('.foe-go');
+  if (b) { Sound.unlock(); startFight(+b.dataset.i); }
+};
+
+/* ---------- Butin ---------- */
+function openLoot() {
+  if (!R.pending) return;
+  $('lootList').innerHTML = R.pending.map((it, i) => `
+    <button class="shop-item ${it.kind}" data-i="${i}">
+      <img class="ic" src="${itemIcon(it)}" alt=""><b>${RL.itemName(it)}</b><small>${RL.itemDesc(it)}</small>
+      <span class="price">${{ piece: 'Pièce', tech: 'Technique', relic: 'Relique' }[it.kind]}</span>
+    </button>`).join('');
+  $('lootModal').classList.remove('hidden');
+}
+$('lootList').onclick = (e) => {
+  const b = e.target.closest('.shop-item');
+  if (!b) return;
+  const err = RL.grant(R, R.pending[+b.dataset.i]);
+  if (err) { toast(err); return; }
+  R.pending = null;
+  saveRun();
+  Sound.found();
+  $('lootModal').classList.add('hidden');
+  renderRun();
+};
+$('lootSkip').onclick = () => { R.pending = null; saveRun(); $('lootModal').classList.add('hidden'); renderRun(); };
+
+/* ---------- Lancer un combat ---------- */
+function startFight(i) {
+  const foe = R.foes[i];
+  const enemy = RL.enemyArmy(R, R.floor, foe.kind, foe.seed);
+  const opp = makeOpponent(RL.foeElo(R, R.floor, foe.kind), foe.seed);
+  const fen = RL.buildFen(R.army, enemy);
+  const units = {}, types = {};
+  for (const u of R.army) { units[u.sq] = u.id; types[u.id] = u.t; }
+  G = {
+    mode: 'run', opp, color: 'w', tc: null, tcId: '∞', clock: { w: 0, b: 0 }, moves: [], over: null,
+    fen, units, types, sans: [], last: null, snaps: [], recruits: [], caps: 0, freeze: false,
+    freeUndo: R.relics.includes('hourglass') ? 1 : 0,
+    kind: foe.kind, floor: R.floor, reward: RL.foeReward(R, R.floor, foe.kind),
+    start: { w: countTypes(R.army), b: countTypes(enemy) },
+  };
+  game = new Chess(fen);
+  R.fight = G;
+  saveRun();
+  enterGame();
+  setTimeout(() => chat(foe.kind === 'boss'
+    ? ['tu ne passeras pas.', 'enfin, un adversaire digne', 'à genoux devant le Roi Noir']
+    : ['halte !', 'tu ne passeras pas', 'en garde !', 'encore un croisé…', 'pour le royaume !'], 1), 700);
+}
+
+/* ---------- Suivi des pièces pendant le combat ---------- */
+function pushSnap() {
+  G.snaps.push({ fen: game.fen(), units: { ...G.units }, types: { ...G.types }, sans: [...G.sans], last: G.last, recruits: [...G.recruits], caps: G.caps });
+  if (G.snaps.length > 30) G.snaps.shift();
+}
+function trackMove(mv) {
+  G.sans.push(mv.san);
+  G.last = { from: mv.from, to: mv.to };
+  if (mv.color === myColor()) {
+    const id = G.units[mv.from];
+    delete G.units[mv.from];
+    G.units[mv.to] = id;
+    if (mv.promotion) G.types[id] = mv.promotion;
+    if (mv.captured) G.caps++;
+  } else if (mv.captured) {
+    const capSq = mv.flags.includes('e') ? mv.to[0] + mv.from[1] : mv.to;
+    delete G.units[capSq];
+  }
+}
+
+/* Gel : l'ennemi passe son tour (impossible s'il est en échec) */
+function applyFreeze() {
+  G.freeze = false;
+  if (game.inCheck()) {
+    R.techs.freeze = (R.techs.freeze || 0) + 1;
+    toast("Le Gel ne prend pas sur un roi en échec : charge rendue.");
+    return false;
+  }
+  const p = game.fen().split(' ');
+  p[1] = myColor(); p[3] = '-';
+  game.load(p.join(' '));
+  G.sans.push('gelé');
+  for (const sq of squares.keys()) { const pc = game.get(sq); if (pc && pc.color === botColor()) squares.get(sq).classList.add('frozen'); }
+  setTimeout(() => squares.forEach((el) => el.classList.remove('frozen')), 900);
+  chat(['brrr…', 'je suis gelé !', 'hé, je peux plus bouger !'], 1);
+  Sound.tone(1568, 0.08, 'square', 0.04); Sound.tone(2093, 0.12, 'square', 0.03, 0.08);
+  persist(); render();
+  checkGameOver();
+  return true;
+}
+
+/* ---------- Techniques en combat ---------- */
+function techCount(k) { return (R.techs[k] || 0) + (k === 'undo' ? G.freeUndo || 0 : 0); }
+function renderTechs() {
+  const list = Object.keys(RL.TECHS).filter((k) => techCount(k) > 0);
+  const can = canInteract();
+  $('techList').innerHTML = list.length ? list.map((k) => {
+    const T = RL.TECHS[k];
+    const off = !can || (k === 'undo' && !G.snaps.length) || (k === 'freeze' && G.freeze);
+    const on = (targeting && targeting.k === k) || (k === 'freeze' && G.freeze);
+    return `<button data-tech="${k}" class="${on ? 'on' : ''}" style="--c:${T.col}" ${off && !on ? 'disabled' : ''}>
+      <img src="${icon(T.icon, T.col)}" alt=""><span>${T.name}</span><i>${techCount(k)}</i></button>`;
+  }).join('') : '<em class="no-tech">Aucune technique</em>';
+}
+function consume(k) {
+  if (k === 'undo' && G.freeUndo) { G.freeUndo--; return; }
+  R.techs[k]--;
+}
+function banner(text) {
+  $('techText').textContent = text;
+  $('techBanner').classList.toggle('hidden', !text);
+}
+function cancelTargeting() { targeting = null; select(null); banner(''); render(); }
+$('techCancel').onclick = () => {
+  if (G.freeze && !targeting) { G.freeze = false; R.techs.freeze++; persist(); }
+  cancelTargeting();
+};
+
+/* Applique une technique sur une copie de la position et vérifie qu'elle reste jouable */
+function techFen(k, sq, first) {
+  const t = new Chess(game.fen());
+  if (k === 'pawn') t.put({ type: 'p', color: myColor() }, sq);
+  else if (k === 'knight') { t.remove(sq); t.put({ type: 'n', color: myColor() }, sq); }
+  else if (k === 'smite') t.remove(sq);
+  else if (k === 'swap') {
+    const a = t.get(first), b = t.get(sq);
+    t.remove(first); t.remove(sq);
+    t.put(b, first); t.put(a, sq);
+  }
+  const p = t.fen().split(' ');
+  p[3] = '-';
+  const fen = p.join(' ');
+  return RL.positionOk(fen) ? fen : null;
+}
+function techTargets(k, first) {
+  const out = [];
+  for (const sq of squares.keys()) {
+    const p = game.get(sq);
+    const rank = +sq[1];
+    let cand = false;
+    if (k === 'pawn') cand = !p && rank >= 2 && rank <= 4;
+    else if (k === 'knight') cand = p && p.color === myColor() && p.type === 'p';
+    else if (k === 'smite') cand = p && p.color === botColor() && p.type === 'p';
+    else if (k === 'swap') {
+      if (!first) { cand = p && p.color === myColor(); if (cand) { out.push(sq); continue; } }
+      else cand = sq !== first && p && p.color === myColor() && p.type !== game.get(first).type;
+    }
+    if (cand && techFen(k, sq, first)) out.push(sq);
+  }
+  return out;
+}
+
+$('techList').onclick = async (e) => {
+  const b = e.target.closest('[data-tech]');
+  if (!b || b.disabled || !G || G.over) return;
+  const k = b.dataset.tech;
+  Sound.unlock();
+  if (k === 'freeze' && G.freeze) { G.freeze = false; R.techs.freeze++; persist(); banner(''); render(); return; }
+  if (targeting) { const same = targeting.k === k; cancelTargeting(); if (same) return; }
+  if (!canInteract()) return;
+  if (k === 'undo') {
+    const s = G.snaps.pop();
+    if (!s) return;
+    consume('undo');
+    gen++; engine.stop();
+    Object.assign(G, { units: s.units, types: s.types, sans: s.sans, last: s.last, recruits: s.recruits, caps: s.caps, freeze: false });
+    game.load(s.fen);
+    lastMove = s.last; hintMove = null; select(null);
+    Sound.tick();
+    persist(); render();
+    return;
+  }
+  if (k === 'hint') {
+    consume('hint');
+    persist();
+    const token = ++gen;
+    render();
+    const r = await engine.search(game.fen(), { depth: 14, skill: 20 });
+    if (token !== gen) return;
+    if (r.best && r.best !== '(none)') hintMove = uciToObj(r.best);
+    render();
+    return;
+  }
+  if (k === 'freeze') {
+    consume('freeze');
+    G.freeze = true;
+    persist();
+    banner("Gel prêt : joue ton coup, l'ennemi passera son tour.");
+    render();
+    return;
+  }
+  const tg = techTargets(k, null);
+  if (!tg.length) { toast(`${RL.TECHS[k].name} : aucune case possible pour l'instant.`); return; }
+  targeting = { k, first: null };
+  select(null);
+  targets = tg;
+  banner({ pawn: 'Touche une case vide (rangées 2 à 4) pour poser un pion.', knight: 'Touche un de tes pions pour l\'adouber.', swap: 'Touche la première pièce à échanger.', smite: 'Touche un pion ennemi à foudroyer.' }[k]);
+  render();
+};
+
+function techTarget(sq) {
+  const { k, first } = targeting;
+  if (!targets.includes(sq)) { cancelTargeting(); return; }
+  if (k === 'swap' && !first) {
+    const tg = techTargets('swap', sq);
+    if (!tg.length) { toast('Aucun échange possible avec cette pièce.'); return; }
+    targeting.first = sq;
+    selected = sq;
+    targets = tg;
+    banner('Touche la seconde pièce.');
+    Sound.tick();
+    render();
+    return;
+  }
+  const fen = techFen(k, sq, first);
+  if (!fen) { cancelTargeting(); return; }
+  consume(k);
+  if (k === 'pawn') { const id = R.nextId++; G.units[sq] = id; G.types[id] = 'p'; G.recruits.push(id); }
+  else if (k === 'knight') G.types[G.units[sq]] = 'n';
+  else if (k === 'swap') { const a = G.units[first], b = G.units[sq]; G.units[first] = b; G.units[sq] = a; }
+  game.load(fen);
+  targeting = null; select(null); hintMove = null;
+  banner(G.freeze ? "Gel prêt : joue ton coup, l'ennemi passera son tour." : '');
+  persist();
+  render();
+  const fxCol = k === 'smite' ? botColor() : myColor();
+  dust(sq, fxCol, 16);
+  if (first) dust(first, fxCol, 10);
+  const pc = squares.get(sq)?.querySelector('.pc');
+  if (pc) land(pc);
+  if (k === 'smite') { Sound.capture(); Sound.tone(220, 0.2, 'sawtooth', 0.05); chat(['aïe !', 'hé !', 'de la triche !', 'mon pion !!'], 0.8); }
+  else Sound.found();
+}
+
+$('runFlipBtn').onclick = () => $('flipBtn').onclick();
+$('runResignBtn').onclick = async () => {
+  if (!G || G.over) return;
+  const ok = await confirmBox('Abandonner ?', 'Ta croisade prendra fin.');
+  if (ok) finish({ kind: 'l', title: 'Abandon', text: `${G.opp.name} gagne par abandon.` });
+};
+
+/* ---------- Fin d'un combat ---------- */
+function finishRun(res) {
+  G.over = res.kind;
+  gen++;
+  engine.stop();
+  thinking = false;
+  $('thinking').classList.remove('on');
+  targeting = null; banner('');
+  select(null);
+  render();
+  const F = G;
+  R.fight = null;
+  const boss = F.kind === 'boss';
+  const out = { gold: 0, lost: [], promoted: [], joined: [] };
+  if (res.kind === 'l' || (res.kind === 'd' && boss)) {
+    R.over = 'l';
+  } else {
+    const alive = new Set(Object.values(F.units));
+    for (const u of R.army) {
+      if (!alive.has(u.id)) { out.lost.push(u.t); continue; }
+      if (F.types[u.id] !== u.t) { out.promoted.push(F.types[u.id]); u.t = F.types[u.id]; }
+    }
+    R.army = R.army.filter((u) => alive.has(u.id));
+    // un pion promu ne peut pas rester en rangée 1… il n'y en a jamais : promu = pièce
+    for (const id of F.recruits) {
+      if (!alive.has(id)) continue;
+      if (!RL.canRecruit(R, F.types[id]) && RL.autoPlace(R, { id, t: F.types[id], sq: null })) out.joined.push(F.types[id]);
+    }
+    R.stats.captures += F.caps;
+    R.stats.lost += out.lost.length;
+    if (res.kind === 'w') {
+      out.gold = F.reward + (R.relics.includes('loot') ? F.caps : 0);
+      R.gold += out.gold;
+      R.stats.wins++;
+      if (R.relics.includes('barracks') && RL.recruit(R, 'p')) out.joined.push('p');
+    }
+    if (boss) R.over = 'w';
+    else {
+      if (res.kind === 'w') R.pending = RL.makeLoot(R, F.kind);
+      R.floor++;
+      R.shop = RL.makeShop(R);
+      R.foes = RL.makeFoes(R);
+    }
+  }
+  saveRun();
+  if (res.kind === 'l') chat(['gg', 'retourne chez toi, croisé', 'trop facile'], 0.8);
+  if (res.kind === 'w') chat(boss ? ['impossible…', 'mon royaume…'] : ['je me rends !', 'pitié !', 'bien joué…'], 0.8);
+  setTimeout(() => showRunResult(res, out, boss), 900);
+}
+
+function setRunResultButtons(run) {
+  $('runRes').classList.toggle('hidden', !run);
+  $('runNextBtn').classList.toggle('hidden', !run);
+  $('rematchBtn').classList.toggle('hidden', run);
+  $('newGameBtn').classList.toggle('hidden', run);
+}
+function showRunResult(res, out, boss) {
+  ({ w: () => Sound.win(), l: () => Sound.lose(), d: () => Sound.draw() })[res.kind]();
+  const rb = $('resultRibbon');
+  rb.textContent = res.kind === 'w' && boss ? 'Croisade accomplie !' : res.title;
+  rb.style.setProperty('--rb', { w: 'var(--green)', l: 'var(--red)', d: '#8a7a64' }[res.kind]);
+  $('resultText').textContent = res.text;
+  $('eloChange').classList.add('hidden');
+  $('rankUp').classList.add('hidden');
+  setRunResultButtons(true);
+  let html = '';
+  if (R.over === 'l') html += `<p class="ink">Ta croisade s'arrête ${boss ? 'aux portes du Roi Noir' : `à l'étage ${R.floor + 1}`}.</p>`;
+  else {
+    if (out.gold) html += `<div class="rr-line">Or gagné ${coin('+' + out.gold)}</div>`;
+    if (res.kind === 'd') html += '<div class="rr-line">Nulle : tu passes, mais sans butin.</div>';
+    if (out.lost.length) html += `<div class="rr-line">Tombées <span class="strip">${out.lost.map((t) => `<img src="${pieceSprite('w', t)}" alt="">`).join('')}</span></div>`;
+    else if (!boss) html += '<div class="rr-line">Aucune perte !</div>';
+    if (out.promoted.length) html += `<div class="rr-line">Promues <span class="strip">${out.promoted.map((t) => `<img src="${pieceSprite('w', t)}" alt="">`).join('')}</span></div>`;
+    if (out.joined.length) html += `<div class="rr-line">Recrues <span class="strip">${out.joined.map((t) => `<img src="${pieceSprite('w', t)}" alt="">`).join('')}</span></div>`;
+  }
+  $('runRes').innerHTML = html;
+  $('runNextBtn').textContent = R.over ? 'Voir le bilan' : 'Continuer';
+  $('resultModal').classList.remove('hidden');
+}
+$('runNextBtn').onclick = () => {
+  $('resultModal').classList.add('hidden');
+  gen++; engine.stop(); paused = true;
+  G = null;
+  if (R.over) showRunEnd(); else openRun();
+};
+
+/* ---------- Bilan de la croisade ---------- */
+function showRunEnd() {
+  if (!R) return;
+  const won = R.over === 'w';
+  const reached = won ? RL.FLOORS : R.floor + 1;
+  const best = store.get('px.runBest', null);
+  const record = !best || reached > best.floor || (won && !best.won);
+  if (record) store.set('px.runBest', { floor: reached, won });
+  $('runEndRibbon').textContent = won ? 'Victoire !' : 'Fin de la croisade';
+  $('runEndRibbon').style.setProperty('--rb', won ? 'var(--gold)' : 'var(--red)');
+  $('runEndText').textContent = won ? 'Le Roi Noir est tombé. Ton armée entre dans la légende !' : `Ta croisade s'achève à l'étage ${reached}/${RL.FLOORS}.`;
+  $('runEndStats').innerHTML = `
+    <div><b>${R.stats.wins}</b><span>Victoires</span></div>
+    <div><b>${R.stats.captures}</b><span>Captures</span></div>
+    <div><b>${R.stats.lost}</b><span>Pertes</span></div>
+    ${record ? '<p class="rankup">Nouveau record !</p>' : ''}
+    <div class="end-army">${armyStrip(R.army, 'w')}</div>`;
+  store.del('px.run');
+  R = null;
+  show('home');
+  renderHome();
+  $('runEndModal').classList.remove('hidden');
+  Sound[won ? 'win' : 'lose']();
+}
+$('runAgainBtn').onclick = () => {
+  $('runEndModal').classList.add('hidden');
+  R = RL.newRun(profile.elo);
+  saveRun();
+  openRun();
+};
+$('runEndHome').onclick = () => { $('runEndModal').classList.add('hidden'); renderHome(); show('home'); };
 
 /* =========================================================
    DÉMARRAGE

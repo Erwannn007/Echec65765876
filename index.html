@@ -88,6 +88,7 @@
         <button id="rankedBtn" class="btn green big-btn"><img data-icon="sword" alt="">Jouer classé</button>
         <button id="friendlyBtn" class="btn blue friendly"><img data-icon="heart" alt=""><span>Amical</span></button>
       </div>
+      <button id="runBtn" class="btn purple run-btn"><img data-icon="crown" alt=""><span>Croisade</span><small id="runBtnSub">Mode roguelike</small></button>
     </div>
   </section>
 
@@ -144,6 +145,39 @@
     </div>
   </section>
 
+  <!-- ================= CROISADE (camp entre deux combats) ================= -->
+  <section id="run" class="screen scroll">
+    <div class="topbar">
+      <button id="runBackBtn" class="sq-btn" aria-label="Accueil"><img data-icon="back" alt=""></button>
+      <div class="mode"><b>Croisade</b> · <span id="runFloor"></span></div>
+      <div class="gold" id="runGold"></div>
+    </div>
+
+    <div class="run-track" id="runTrack"></div>
+
+    <div class="label">Ton armée <span class="count" id="runCount"></span></div>
+    <div class="formation" id="formation"></div>
+    <p class="run-tip" id="formTip">Touche une pièce puis une case pour réorganiser ta formation.</p>
+
+    <div class="label">Techniques <span class="count">à utiliser en combat</span></div>
+    <div class="inv" id="runTechs"></div>
+
+    <div class="label">Reliques</div>
+    <div class="inv" id="runRelics"></div>
+
+    <div id="runShopBlock">
+      <div class="label">Marché</div>
+      <div class="shop" id="runShop"></div>
+    </div>
+
+    <div id="runFoesBlock">
+      <div class="label" id="runFoesLabel">Prochain combat</div>
+      <div class="foes" id="runFoes"></div>
+    </div>
+    <button id="runResumeBtn" class="btn green big-btn hidden"><img data-icon="sword" alt="">Reprendre le combat</button>
+    <button id="runQuitBtn" class="link light run-quit">Abandonner la croisade</button>
+  </section>
+
   <!-- ================= PARTIE ================= -->
   <section id="game" class="screen">
     <div class="topbar">
@@ -188,6 +222,13 @@
       <button id="flipBtn"><img data-icon="flip" alt=""><span>Tourner</span></button>
       <button id="resignBtn"><img data-icon="flag" alt=""><span>Abandon</span></button>
     </div>
+
+    <div class="tech-banner hidden" id="techBanner"><span id="techText"></span><button id="techCancel">Annuler</button></div>
+    <div class="actions run-actions hidden" id="runActions">
+      <div class="tech-list" id="techList"></div>
+      <button id="runFlipBtn" class="fixed"><img data-icon="flip" alt=""><span>Tourner</span></button>
+      <button id="runResignBtn" class="fixed"><img data-icon="flag" alt=""><span>Abandon</span></button>
+    </div>
   </section>
 
   <!-- ================= FENÊTRES ================= -->
@@ -201,6 +242,8 @@
         <span class="delta" id="resDelta"></span>
       </div>
       <p class="rankup hidden" id="rankUp"></p>
+      <div class="run-res hidden" id="runRes"></div>
+      <button id="runNextBtn" class="btn green hidden">Continuer</button>
       <button id="rematchBtn" class="btn green">Revanche</button>
       <button id="newGameBtn" class="btn wood">Nouvel adversaire</button>
       <div class="row2">
@@ -248,6 +291,44 @@
       <button id="historyClose" class="btn wood">Fermer</button>
     </div>
   </div>
+
+  <div id="runModal" class="overlay hidden">
+    <div class="panel paper card">
+      <h3 class="ink">Croisade</h3>
+      <p class="ink soft">Mode roguelike : traverse 8 combats avec une petite armée, jusqu'au Roi Noir.</p>
+      <ul class="rules ink">
+        <li><b>Armée persistante :</b> une pièce perdue l'est pour toute la croisade.</li>
+        <li><b>Or :</b> chaque victoire rapporte de l'or à dépenser au marché.</li>
+        <li><b>Techniques :</b> des pouvoirs à charges (Gel, Foudre, Renfort…).</li>
+        <li><b>Reliques :</b> des bonus permanents.</li>
+        <li><b>Une défaite</b> et la croisade est terminée.</li>
+      </ul>
+      <p class="ink soft" id="runBest"></p>
+      <button id="runStartBtn" class="btn purple"><img data-icon="crown" alt="">Lancer la croisade</button>
+      <button id="runModalClose" class="link">Fermer</button>
+    </div>
+  </div>
+
+  <div id="lootModal" class="overlay hidden">
+    <div class="panel paper card">
+      <div class="ribbon" style="--rb: var(--gold)">Butin</div>
+      <p class="ink soft">Choisis une récompense.</p>
+      <div class="loot" id="lootList"></div>
+      <button id="lootSkip" class="link">Passer</button>
+    </div>
+  </div>
+
+  <div id="runEndModal" class="overlay hidden">
+    <div class="panel paper card">
+      <div class="ribbon" id="runEndRibbon"></div>
+      <p class="ink" id="runEndText"></p>
+      <div class="run-stats" id="runEndStats"></div>
+      <button id="runAgainBtn" class="btn purple">Nouvelle croisade</button>
+      <button id="runEndHome" class="link">Accueil</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
 
   <div id="ambLight" class="amb amb-light"></div>
   <div id="ambFront" class="amb amb-front"></div>

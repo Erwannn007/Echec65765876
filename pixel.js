@@ -32,23 +32,23 @@ const px = (ctx, x, y, col, w = 1, h = 1) => { ctx.fillStyle = col; ctx.fillRect
    Le contour, la lumière (à gauche) et l'ombre (à droite)
    sont calculés automatiquement, puis on ajoute le veinage. */
 const SHAPES = {
-  // Pion : petit, tête bien ronde, socle étroit
+  // Pion : tête ronde sur un socle large
   p: [
     '................',
     '................',
     '................',
-    '................',
     '......xxxx......',
     '.....xxxxxx.....',
     '.....xxxxxx.....',
+    '.....xxxxxx.....',
     '......xxxx......',
+    '.....xxxxxx.....',
+    '......xxxx......',
+    '......xxxx......',
+    '.....xxxxxx.....',
     '....xxxxxxxx....',
-    '......xxxx......',
-    '......xxxx......',
-    '.....xxxxxx.....',
-    '.....xxxxxx.....',
-    '....xxxxxxxx....',
-    '....xxxxxxxx....',
+    '...xxxxxxxxxx...',
+    '...xxxxxxxxxx...',
     '................',
   ],
   // Tour : créneaux bien découpés, corps droit et massif

@@ -1,8 +1,8 @@
 // Hors-ligne + mises à jour automatiques : on sert le cache tout de suite,
 // et on télécharge la nouvelle version en arrière-plan pour la prochaine ouverture.
-const VERSION = 'echecs-v5';
+const VERSION = 'echecs-v8';
 const ASSETS = [
-  './', 'index.html', 'styles.css', 'app.js', 'pixel.js', 'ambience.js', 'manifest.webmanifest',
+  './', 'index.html', 'styles.css', 'app.js', 'pixel.js', 'ambience.js', 'roguelike.js', 'manifest.webmanifest',
   'lib/chess.js', 'fonts/PixelifySans.woff2', 'fonts/Jersey10.woff2',
   'engine/stockfish-19-lite-single.js', 'engine/stockfish-19-lite-single.wasm',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png',

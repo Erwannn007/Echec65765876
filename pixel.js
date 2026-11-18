@@ -28,10 +28,11 @@ function canvas(w, h) {
 const px = (ctx, x, y, col, w = 1, h = 1) => { ctx.fillStyle = col; ctx.fillRect(x, y, w, h); };
 
 /* ---------------- PIÈCES (silhouettes 16×16) ----------------
-   x = bois, o = gravure (trait sombre), e = œil
+   x = bois, o = gravure (trait sombre), e = œil, g = or (croix, perles)
    Le contour, la lumière (à gauche) et l'ombre (à droite)
    sont calculés automatiquement, puis on ajoute le veinage. */
 const SHAPES = {
+  // Pion : tête ronde sur un socle large
   p: [
     '................',
     '................',
@@ -50,35 +51,37 @@ const SHAPES = {
     '...xxxxxxxxxx...',
     '................',
   ],
+  // Tour : créneaux bien découpés, corps droit et massif
   r: [
     '................',
     '................',
-    '...xx.xxxx.xx...',
-    '...xx.xxxx.xx...',
-    '...xxxxxxxxxx...',
+    '..xxx.xxxx.xxx..',
+    '..xxx.xxxx.xxx..',
+    '..xxxxxxxxxxxx..',
+    '..xxxxxxxxxxxx..',
     '...xxxxxxxxxx...',
     '....xxxxxxxx....',
-    '.....xxxxxx.....',
-    '.....xxoxxx.....',
-    '.....xxxxxx.....',
-    '.....xxxxox.....',
+    '....xxxxxxxx....',
+    '....xoooooox....',
+    '....xxxxxxxx....',
     '....xxxxxxxx....',
     '...xxxxxxxxxx...',
     '..xxxxxxxxxxxx..',
     '..xxxxxxxxxxxx..',
     '................',
   ],
+  // Cavalier : tête de cheval avec crinière
   n: [
     '................',
-    '........xx......',
-    '.......xxxx.....',
-    '......xxxxxxx...',
-    '.....xxxxxxxxx..',
-    '....xxxexxxxxx..',
-    '...xxxxxxxxxxx..',
-    '..xoxxxxxxxxxx..',
-    '..xxxxx.xxxxxx..',
-    '...xxx..xxxxxx..',
+    '.......xx.......',
+    '......xxxxx.....',
+    '.....xxxxxxxx...',
+    '....xxxxxxxxxx..',
+    '...xxxexxxxxoxx.',
+    '..xxxxxxxxxxxox.',
+    '..xoxxxxxxxxxox.',
+    '..xxxxx.xxxxxox.',
+    '...xxx..xxxxxxx.',
     '.......xxxxxxx..',
     '......xxxxxxxx..',
     '.....xxxxxxxxx..',
@@ -86,56 +89,59 @@ const SHAPES = {
     '...xxxxxxxxxxxx.',
     '................',
   ],
+  // Fou : grande mitre pointue avec une entaille en diagonale
   b: [
-    '................',
+    '.......gg.......',
     '.......xx.......',
     '......xxxx......',
     '.....xxxxxx.....',
-    '.....xxxoxx.....',
-    '....xxxoxxxx....',
+    '....xxxxx.xx....',
+    '....xxxx.xxx....',
+    '....xxxxxxxx....',
     '....xxxxxxxx....',
     '.....xxxxxx.....',
     '......xxxx......',
-    '.....xxxxxx.....',
+    '....xxxxxxxx....',
     '......xxxx......',
     '.....xxxxxx.....',
-    '....xxxxxxxx....',
     '...xxxxxxxxxx...',
     '...xxxxxxxxxx...',
     '................',
   ],
+  // Dame : couronne à pointes fines surmontées de perles dorées
   q: [
-    '................',
-    '..x....xx....x..',
-    '..xx..xxxx..xx..',
-    '..xxx.xxxx.xxx..',
-    '..xxxxxxxxxxxx..',
-    '...xxxxxxxxxx...',
-    '....xxxxxxxx....',
-    '.....xxxxxx.....',
-    '....xoooooox....',
-    '.....xxxxxx.....',
-    '.....xxxxxx.....',
-    '....xxxxxxxx....',
-    '...xxxxxxxxxx...',
-    '..xxxxxxxxxxxx..',
-    '..xxxxxxxxxxxx..',
-    '................',
-  ],
-  k: [
-    '.......xx.......',
-    '......xxxx......',
-    '.......xx.......',
-    '..xxx..xx..xxx..',
-    '.xxxxxxxxxxxxxx.',
-    '.xxxxxxxxxxxxxx.',
+    '..g..g.gg.g..g..',
+    '..x..x.xx.x..x..',
+    '..xx.xxxxxx.xx..',
     '..xxxxxxxxxxxx..',
     '...xxxxxxxxxx...',
     '...xoooooooox...',
+    '....xxxxxxxx....',
     '.....xxxxxx.....',
+    '......xxxx......',
+    '.....xxxxxx.....',
+    '......xxxx......',
     '.....xxxxxx.....',
     '....xxxxxxxx....',
+    '..xxxxxxxxxxxx..',
+    '..xxxxxxxxxxxx..',
+    '................',
+  ],
+  // Roi : grande croix dorée sur un dôme arrondi
+  k: [
+    '.......gg.......',
+    '.....gggggg.....',
+    '.......gg.......',
+    '......xxxx......',
+    '....xxxxxxxx....',
     '...xxxxxxxxxx...',
+    '..xxxxxxxxxxxx..',
+    '..xxxxxxxxxxxx..',
+    '...xoooooooox...',
+    '....xxxxxxxx....',
+    '.....xxxxxx.....',
+    '....xxxxxxxx....',
+    '.....xxxxxx.....',
     '..xxxxxxxxxxxx..',
     '..xxxxxxxxxxxx..',
     '................',
@@ -143,8 +149,8 @@ const SHAPES = {
 };
 
 const WOOD = {
-  w: { line: '#3b2412', dark: '#b88b55', base: '#e6c793', grain: '#d9b680', light: '#fbeccb', gold: '#c9932e' },
-  b: { line: '#120a05', dark: '#2a170c', base: '#4d2e1a', grain: '#3f2414', light: '#82573a', gold: '#a8742a' },
+  w: { line: '#3b2412', dark: '#b88b55', base: '#e6c793', grain: '#d9b680', light: '#fbeccb', gold: '#c9932e', goldHi: '#f2c94c' },
+  b: { line: '#120a05', dark: '#2a170c', base: '#4d2e1a', grain: '#3f2414', light: '#82573a', gold: '#c9932e', goldHi: '#f2c94c' },
 };
 
 const pieceCache = new Map();
@@ -166,7 +172,8 @@ export function pieceSprite(color, type) {
       const ch = at(x, y);
       if (!isFill(ch)) continue;
       let col;
-      if (ch === 'o' || ch === 'e' || isEdge(x, y)) col = pal.line;
+      if (ch === 'g') col = (y === 0 || at(x, y - 1) === '.') ? pal.goldHi : pal.gold;
+      else if (ch === 'o' || ch === 'e' || isEdge(x, y)) col = pal.line;
       else if (isEdge(x - 1, y) || (isEdge(x, y - 1) && x < 8)) col = pal.light;
       else if (isEdge(x + 1, y) || isEdge(x, y + 1) || isEdge(x + 1, y + 1)) col = pal.dark;
       else {
@@ -176,9 +183,10 @@ export function pieceSprite(color, type) {
       px(ctx, x, y, col);
     }
   }
-  // petit reflet doré sur la dame et le roi
-  if (type === 'k') { px(ctx, 7, 1, pal.gold, 2, 1); }
-  if (type === 'q') { px(ctx, 7, 2, pal.gold, 2, 1); }
+  // ombre portée sous le socle pour bien poser la pièce sur la case
+  let x0 = 16, x1 = -1;
+  for (let x = 0; x < 16; x++) if (isFill(at(x, 14))) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); }
+  if (x1 >= 0) px(ctx, x0 + 1, 15, 'rgba(0,0,0,0.35)', x1 - x0, 1);
   const url = c.toDataURL();
   pieceCache.set(key, url);
   return url;
@@ -453,6 +461,21 @@ const ICONS = {
   right:  ['...o.....', '...oo....', '...ooo...', '...oooo..', '...ooooo.', '...oooo..', '...ooo...', '...oo....', '...o.....'],
   dice:   ['ooooooooo', 'o.ooooo.o', 'ooooooooo', 'ooooooooo', 'oooo.oooo', 'ooooooooo', 'ooooooooo', 'o.ooooo.o', 'ooooooooo'],
   pencil: ['......oo.', '.....oooo', '....oooo.', '...oooo..', '..oooo...', '.oooo....', '.ooo.....', 'oo.......', '.........'],
+  // --- Croisade : techniques et reliques ---
+  snow:   ['....o....', '.o..o..o.', '..o.o.o..', '...ooo...', 'ooooooooo', '...ooo...', '..o.o.o..', '.o..o..o.', '....o....'],
+  plus:   ['.........', '...ooo...', '...ooo...', '.ooooooo.', '.ooooooo.', '.ooooooo.', '...ooo...', '...ooo...', '.........'],
+  up:     ['....o....', '...ooo...', '..ooooo..', '.ooooooo.', '...ooo...', '...ooo...', '...ooo...', '...ooo...', '.........'],
+  swap:   ['..o......', '.oo......', 'ooooooo..', '.oo......', '..o...o..', '......oo.', '..ooooooo', '......oo.', '......o..'],
+  bolt:   ['.....ooo.', '....ooo..', '...ooo...', '..oooooo.', '....ooo..', '...ooo...', '..oo.....', '.oo......', 'o........'],
+  coin:   ['..ooooo..', '.ooooooo.', 'ooo.o.ooo', 'ooo.o.ooo', 'ooo.o.ooo', 'ooo.o.ooo', 'ooo.o.ooo', '.ooooooo.', '..ooooo..'],
+  bag:    ['...ooo...', '....o....', '..ooooo..', '.ooooooo.', 'ooooooooo', 'ooooooooo', 'ooooooooo', '.ooooooo.', '..ooooo..'],
+  eye:    ['.........', '..ooooo..', '.o.....o.', 'o..ooo..o', 'o..ooo..o', 'o..ooo..o', '.o.....o.', '..ooooo..', '.........'],
+  tent:   ['....o....', '...ooo...', '..ooooo..', '.ooo.ooo.', '.oo...oo.', 'ooo...ooo', 'oo.....oo', 'ooooooooo', '.........'],
+  hourglass: ['ooooooooo', '.o.....o.', '..ooooo..', '...ooo...', '....o....', '...o.o...', '..o.o.o..', '.ooooooo.', 'ooooooooo'],
+  tag:    ['oooooo...', 'o....oo..', 'o.oo..oo.', 'o.oo...oo', 'o......oo', 'o.....oo.', 'o....oo..', 'oooooo...', '.........'],
+  bomb:   ['.......o.', '......o..', '...ooo...', '..ooooo..', '.oo.oooo.', '.o.ooooo.', '.ooooooo.', '..ooooo..', '...ooo...'],
+  crown:  ['.........', 'o...o...o', 'oo.ooo.oo', 'ooooooooo', 'ooooooooo', 'ooooooooo', '.........', 'ooooooooo', '.........'],
+  skull:  ['..ooooo..', '.ooooooo.', 'ooooooooo', 'o..ooo..o', 'o..ooo..o', 'ooooooooo', '.ooo.ooo.', '..ooooo..', '..o.o.o..'],
 };
 const iconCache = new Map();
 export function icon(name, col = '#f3e2c0') {
